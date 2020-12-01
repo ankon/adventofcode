@@ -1,0 +1,6 @@
+{
+	"extends": "tsconfig-collaborne",
+	"compilerOptions": {
+		"outDir": "out"
+	}
+}
