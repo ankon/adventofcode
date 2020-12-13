@@ -13,7 +13,21 @@ const adjacency = [
 	[ 1, -1], [ 1, 0], [ 1, 1],
 ];
 
-function iterate(field: State[][]): { newField: State[][], changes: number } {
+type GetNeighborOccupancy = (field: State[][], i: number, j: number) => number;
+
+function getNeighborOccupancyPart1(field: State[][], i: number, j: number): number {
+	return adjacency.reduce((result, [di, dj]) => {
+		const newI = i + di;
+		const newJ = j + dj;
+		if (between(newI, 0, field.length - 1) && between(newJ, 0, field[i].length - 1)) {
+			return result + (field[newI][newJ] === '#' ? 1 : 0);
+		} else {
+			return result;
+		}
+	}, 0);
+}
+
+function iterate(field: State[][], getNeighborOccupancy: GetNeighborOccupancy, dieAtOrAbove: number): { newField: State[][], changes: number } {
 	const newField: State[][] = [];
 	let changes = 0;
 
@@ -26,19 +40,11 @@ function iterate(field: State[][]): { newField: State[][], changes: number } {
 				newRow.push('.');
 				continue;
 			}
-			const count = adjacency.reduce((result, [di, dj]) => {
-				const newI = i + di;
-				const newJ = j + dj;
-				if (between(newI, 0, field.length - 1) && between(newJ, 0, rowLength - 1)) {
-					return result + (field[newI][newJ] === '#' ? 1 : 0);
-				} else {
-					return result;
-				}
-			}, 0);
-			if (current === 'L' && count == 0) {
+			const occupied = getNeighborOccupancy(field, i, j);
+			if (current === 'L' && occupied == 0) {
 				newRow.push('#');
 				changes++;
-			} else if (current === '#' && count >= 4) {
+			} else if (current === '#' && occupied >= dieAtOrAbove) {
 				newRow.push('L');
 				changes++;
 			} else {
@@ -65,9 +71,9 @@ function processInput(input: string) {
 		let field = initialField;
 		let result;
 		do {
-			result = iterate(field);
+			result = iterate(field, getNeighborOccupancyPart1, 4);
 			field = result.newField;
-			field.forEach(row => console.log(row.join('')));
+			// field.forEach(row => console.log(row.join('')));
 			console.log(`Changes after round ${round}: ${result.changes}`);
 			round++;
 		} while (result.changes > 0);
