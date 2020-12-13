@@ -3,11 +3,10 @@
 import { createInterface } from 'readline';
 import { createReadStream } from 'fs';
 
+import { between } from './utils';
+
 const POLICY_RE = /^(\d+)-(\d+) (.)/;
 
-function between(number: number, min: number, max: number): boolean {
-	return number >= min && number <= max;
-}
 
 function parseOriginalPolicy(policy: string): (password: string) => boolean {
 	const [, min, max, policyCharacter] = POLICY_RE.exec(policy)!;

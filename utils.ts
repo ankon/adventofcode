@@ -13,3 +13,7 @@ export function qs(numbers: number[], number: number): number {
 	}
 	return -left - 1;
 }
+
+export function between(number: number, min: number, max: number): boolean {
+	return number >= min && number <= max;
+}
