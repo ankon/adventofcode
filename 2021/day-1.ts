@@ -7,14 +7,24 @@ import { createInterface } from 'readline';
 function processInput(input: string) {
 	const rl = createInterface(createReadStream(input));
 
-	let lastValue: number|undefined = undefined;
+	const windowSize = 3;
+	const window: number[] = [];
 	let increases: number = 0;
 	rl.on('line', line => {
 		const value = Number(line);
-		if (lastValue && value > lastValue) {
-			increases++;
+		let lastSum;
+		if (window.length === windowSize) {
+			lastSum = window.reduce((s, v) => s + v, 0);
+			window.splice(0, 1);
 		}
-		lastValue = value;
+		window.push(value);
+		if (typeof lastSum !== 'undefined') {
+			// We removed one, and we added one -- so window.length is still equal to the window size.
+			const sum = window.reduce((s, v) => s + v, 0);
+			if (sum > lastSum) {
+				increases++;
+			}
+		}
 	});
 	rl.on('close', () => {
 		console.log(`Results for ${input}: ${increases} increases`);
