@@ -3,7 +3,7 @@
 import { createInterface } from 'readline';
 import { createReadStream } from 'fs';
 
-import { between } from './utils';
+import { between } from '../utils';
 
 const POLICY_RE = /^(\d+)-(\d+) (.)/;
 

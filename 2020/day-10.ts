@@ -4,7 +4,7 @@ import { createReadStream } from 'fs';
 import { basename, extname } from 'path';
 import { createInterface } from 'readline';
 
-import { qs } from './utils';
+import { qs } from '../utils';
 
 function makeKey(queue: number[]): string {
 	return queue.join('-');

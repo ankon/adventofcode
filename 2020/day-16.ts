@@ -3,7 +3,8 @@
 import { createReadStream } from 'fs';
 import { basename, extname } from 'path';
 import { createInterface } from 'readline';
-import { between } from './utils';
+
+import { between } from '../utils';
 
 type Rule = { min: number, max: number };
 type Field = { name: string, rules: Rule[] };

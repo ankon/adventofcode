@@ -3,7 +3,7 @@
 import { createInterface } from 'readline';
 import { createReadStream } from 'fs';
 
-import { qs } from './utils';
+import { qs } from '../utils';
 
 function part1BruteForce(numbers: number[]): [number, number, number] {
 	for (let i = 0; i < numbers.length; i++) {
