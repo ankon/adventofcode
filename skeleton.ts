@@ -16,4 +16,11 @@ function processInput(input: string) {
 	});
 }
 
-processInput(`${basename(process.argv[1], extname(process.argv[1]))}.input`);
+const INPUT_SPECS = [
+	'-example',
+	'',
+];
+for (const inputSpec of INPUT_SPECS) {
+	const inputFile = `${basename(process.argv[1], extname(process.argv[1]))}${inputSpec}.input`;
+	processInput(inputFile);
+}
