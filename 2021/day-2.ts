@@ -9,6 +9,7 @@ function processInput(input: string): Promise<void> {
 
 	return new Promise((resolve, reject) => {
 		let horizontalPosition = 0;
+		let aim = 0;
 		let depth = 0;
 
 		rl.on('line', line => {
@@ -17,12 +18,13 @@ function processInput(input: string): Promise<void> {
 			switch (command) {
 				case 'forward':
 					horizontalPosition += amount;
+					depth += aim * amount;
 					break;
 				case 'down':
-					depth += amount;
+					aim += amount;
 					break;
 				case 'up':
-					depth -= amount;
+					aim -= amount;
 					break;
 			}
 		});
