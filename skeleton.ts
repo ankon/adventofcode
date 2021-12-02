@@ -25,7 +25,11 @@ function processInput(input: string): Promise<void> {
 
 async function main(inputFiles: string[]) {
 	for (const inputFile of inputFiles) {
-		await processInput(inputFile);
+		try {
+			await processInput(inputFile);
+		} catch (err: any) {
+			console.error(`Cannot process ${inputFile}: ${err.message}`);
+		}
 	}
 }
 
