@@ -4,16 +4,30 @@ import { createReadStream } from 'fs';
 import { basename, extname } from 'path';
 import { createInterface } from 'readline';
 
+/**
+ * Complete report
+ *
+ * - String values must have the same length
+ * - String values must only contain '0' and '1' characters
+ */
+type Report = string[];
 type Counter = [zeros: number, ones: number];
 type Counters = Counter[];
 
-function MostCommon([zeros, ones]: Counter) {
-	// XXX: What if the numbers are the same?
-	return zeros > ones ? 0 : 1;
+function selectMostCommon([zeros, ones]: Counter, ifEqual: number) {
+	if (zeros === ones) {
+		return ifEqual;
+	} else {
+		return zeros > ones ? 0 : 1;
+	}
 }
-function LeastCommon([zeros, ones]: Counter) {
-	// XXX: What if the numbers are the same?
-	return zeros > ones ? 1 : 0;
+
+function selectLeastCommon([zeros, ones]: Counter, ifEqual: number) {
+	if (zeros === ones) {
+		return ifEqual;
+	} else {
+		return zeros > ones ? 1 : 0;
+	}
 }
 
 function createPowerRate(counters: Counters, select: (counter: Counter) => number): number {
@@ -39,7 +53,7 @@ function updateCounters(counters: Counters, value: string) {
 	});
 }
 
-function toCounters(report: string[]): Counters {
+function toCounters(report: Report): Counters {
 	const counters: Counters = [];
 
 	for (const value of report) {
@@ -57,11 +71,58 @@ function toCounters(report: string[]): Counters {
 	return counters;
 }
 
+
+/**
+ * Filter the report at `position` using `select` and return a new report
+ *
+ * @param report
+ * @param counters
+ * @param position
+ */
+ function filterReport(report: Report, counters: Counters, position: number, select: (counter: Counter) => number): Report {
+	// NB: Counters are LSB->MSB, but position is MSB->LSB
+	const counter = counters[counters.length - position - 1];
+	// Select the value to keep
+	const bit = select(counter);
+	const result: Report = [];
+	for (let i = 0; i < report.length; i++) {
+		const value = report[i];
+		if (value[position] === `${bit}`) {
+			result.push(value);
+		}
+	}
+
+	return result;
+}
+
+function createLifeSupportRating(report: Report, select: (counter: Counter) => number): number {
+	if (report.length === 0) {
+		throw new Error('Report is empty');
+	}
+	const bits = report[0].length;
+
+	let position = 0;
+	let workReport = [...report];
+	while (workReport.length !== 1 && position < bits) {
+		const counters = toCounters(workReport);
+		workReport = filterReport(workReport, counters, position, select);
+		position++;
+	}
+
+	if (workReport.length === 1) {
+		return parseInt(workReport[0], 2);
+	} else if (workReport.length === 0) {
+		throw new Error('No matching numbers');
+	} else {
+		throw new Error('Too many matching numbers');
+	}
+}
+
 function processInput(input: string): Promise<void> {
 	const rl = createInterface(createReadStream(input));
 
 	return new Promise((resolve, reject) => {
-		const report: string[] = [];
+		const report: Report = [];
 
 		rl.on('line', line => {
 			report.push(line);
@@ -71,9 +132,12 @@ function processInput(input: string): Promise<void> {
 		});
 		rl.on('close', () => {
 			const counters = toCounters(report);
-			const gammaRate = createPowerRate(counters, MostCommon);
-			const epsilonRate = createPowerRate(counters, LeastCommon);
-			console.log(`Results for ${input}: power consumption = ${gammaRate} * ${epsilonRate} = ${gammaRate * epsilonRate}`);
+            // NB: For the power rates the `ifEqual` case in the selector should not happen, the `-1` will trigger an error.
+			const gammaRate = createPowerRate(counters, counter => selectMostCommon(counter, -1));
+			const epsilonRate = createPowerRate(counters, counter => selectLeastCommon(counter, -1));
+			const oxygenGeneratorRating = createLifeSupportRating(report, counter => selectMostCommon(counter, 1));
+			const co2ScrubberRating = createLifeSupportRating(report, counter => selectLeastCommon(counter, 0));
+			console.log(`Results for ${input}: power consumption = ${gammaRate} * ${epsilonRate} = ${gammaRate * epsilonRate}, life support rating = ${oxygenGeneratorRating} * ${co2ScrubberRating} = ${oxygenGeneratorRating * co2ScrubberRating}`);
 
 			resolve();
 		});
