@@ -7,6 +7,9 @@
     "watch": "tsc -p tsconfig.json -w"
   },
   "author": "Andreas Kohn <andreas.kohn@gmail.com>",
+  "repository": {
+    "url": "https://github.com/ankon/adventofcode"
+  },
   "license": "ISC",
   "devDependencies": {
     "@types/node": "^14.17.34",
