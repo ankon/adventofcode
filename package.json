@@ -1,6 +1,6 @@
 {
   "name": "@ankon/adventofcode",
-  "version": "2021.3.0",
+  "version": "2021.4.0",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "build": "tsc -p tsconfig.json",
