@@ -85,17 +85,25 @@ function playBingo(card: Board[], numbers: number[]): number {
 		boardMarks.push(marks);
 	}
 
-	// Process the numbers until we see a bingo in a board
+	// Process the numbers until we see a bingo in the last active board
+	const activeBoards = new Array(card.length).fill(true);
 	for (const n of numbers) {
+		console.log(`... ${n}`);
 		for (const boardIndex in card) {
-			// if (boardIndex === '2') {
-			// 	printBoard(card[boardIndex], boardMarks[boardIndex]);
-			// }
-			if (updateMarks(n, card[boardIndex], boardMarks[boardIndex])) {
-				return (
-					n * sumUnmarked(card[boardIndex], boardMarks[boardIndex])
-				);
+			if (!activeBoards[boardIndex]) {
+				continue;
 			}
+			const board = card[boardIndex];
+			if (updateMarks(n, board, boardMarks[boardIndex])) {
+				// It's dead, Jim.
+				activeBoards[boardIndex] = false;
+
+				if (!activeBoards.includes(true)) {
+					// Last one, yeah!
+					return n * sumUnmarked(board, boardMarks[boardIndex]);
+				}
+			}
+			//printBoard(board, boardMarks[boardIndex]);
 		}
 	}
 
@@ -150,7 +158,11 @@ async function main(inputFiles: string[]) {
 	}
 }
 
-const INPUT_SPECS = ['-example', ''];
+const INPUT_SPECS = [
+	//
+	'-example',
+	'',
+];
 
 main(
 	INPUT_SPECS.map(
