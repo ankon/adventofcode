@@ -57,34 +57,16 @@ function updateFloor(
 	// +/-1 (horizontal) or +/- MAX_X (vertical)
 	const deltaX = end.x - start.x;
 	const deltaY = end.y - start.y;
-	if (deltaX === 0 && deltaY === 0) {
-		// "Point"
-		throw new Error(
-			`Invalid line segment ${toString(start)} -> ${toString(end)}: point`
-		);
-	} else if (deltaX !== 0 && deltaY !== 0) {
-		// Non-trivial line
-		console.debug(
-			`Ignoring non-trivial line segment ${toString(start)} -> ${toString(
-				end
-			)}`
-		);
-		return false;
-	} else {
-		console.debug(
-			`Applying line segment ${toString(start)} -> ${toString(end)}`
-		);
-	}
+	console.debug(
+		`Applying line segment ${toString(start)} -> ${toString(end)}`
+	);
 
 	// "Draw" the line
 	const startIndex = start.y * maxX + start.x;
 	const endIndex = end.y * maxX + end.x;
-	let deltaIndex;
-	if (deltaX === 0) {
-		deltaIndex = deltaY < 0 ? -maxX : maxX;
-	} else {
-		deltaIndex = deltaX < 0 ? -1 : 1;
-	}
+	const deltaIndex =
+		(deltaY < 0 ? -maxX : deltaY > 0 ? maxX : 0) +
+		(deltaX < 0 ? -1 : deltaX > 0 ? 1 : 0);
 	let index = startIndex;
 	do {
 		floor.set(index, (floor.get(index) ?? 0) + 1);
@@ -107,7 +89,9 @@ function processInput(input: string): Promise<void> {
 		rl.on('line', (line) => {
 			const lineSegment = parseLineSegment(line);
 			if (updateFloor(floor, lineSegment, opts)) {
-				// printFloor(floor, opts);
+				if (input.includes('example')) {
+					printFloor(floor, opts);
+				}
 			}
 		});
 		rl.on('error', (err) => {
@@ -135,7 +119,11 @@ async function main(inputFiles: string[]) {
 	}
 }
 
-const INPUT_SPECS = ['-example', ''];
+const INPUT_SPECS = [
+	//
+	'-example',
+	'',
+];
 
 main(
 	INPUT_SPECS.map(
