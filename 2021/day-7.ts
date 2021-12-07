@@ -4,7 +4,24 @@ import { createReadStream } from 'fs';
 import { basename, extname } from 'path';
 import { createInterface } from 'readline';
 
-function alignCrabs(positions: number[]): number {
+function linearCost(positionDelta: number): number {
+	return positionDelta;
+}
+
+function increasingCost(positionDelta: number): number {
+	let cost = 0;
+	let nextStepCost = 1;
+	for (let position = 0; position < positionDelta; position++) {
+		cost += nextStepCost;
+		nextStepCost++;
+	}
+	return cost;
+}
+
+function alignCrabs(
+	positions: number[],
+	calculateCosts: (positionDelta: number) => number
+): number {
 	// Brute-force and find the position that takes the least amount of
 	// fuel.
 	const maxPosition = positions.reduce((max, p) => Math.max(max, p), 0);
@@ -12,7 +29,7 @@ function alignCrabs(positions: number[]): number {
 	position: for (let candidate = 0; candidate < maxPosition; candidate++) {
 		let cost = 0;
 		for (let crab = 0; crab < positions.length; crab++) {
-			cost += Math.abs(candidate - positions[crab]);
+			cost += calculateCosts(Math.abs(candidate - positions[crab]));
 			if (cost > lowestCost) {
 				continue position;
 			}
@@ -36,7 +53,12 @@ function processInput(input: string): Promise<void> {
 			reject(err);
 		});
 		rl.on('close', () => {
-			console.log(`Results for ${input}: ${alignCrabs(positions)}`);
+			console.log(
+				`Results for ${input}: linear ${alignCrabs(
+					positions,
+					linearCost
+				)}, increasing ${alignCrabs(positions, increasingCost)}`
+			);
 			resolve();
 		});
 	});
