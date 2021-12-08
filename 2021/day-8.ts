@@ -98,6 +98,7 @@ function recoverOutputValue(sampleDigits: string[], outputDigits: string[], debu
 		b = different;
 		return true;
 	});
+	debugLog(`Identified b: ${b}`);
 
 	// 2 is the one that is left over
 	const acdefg = pickAndRemove(() => true);
