@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 
-import { debug } from 'console';
 import { createReadStream } from 'fs';
 import { basename, extname } from 'path';
 import { createInterface } from 'readline';
 
 function split(s1: string, s2: string): [common: string, different: string] {
-	// Join, and count: If a character appears 2 times its common, otherwise it's different.
+	// Join, and count: If a character appears 2 times its common, if it appears once it's different
+	// and otherwise it isn't in the set.
 	// This works because the alphabet is known and fairly small, so we don't bother too much here.
 	let common: string = '';
 	let different: string = '';
@@ -27,7 +27,7 @@ function recoverOutputValue(sampleDigits: string[], outputDigits: string[], debu
 	function pickAndRemove(candidatePredicate: (digit: string) => boolean): string {
 		const candidates = sampleDigits.filter(candidatePredicate);
 		if (candidates.length !== 1) {
-			throw new Error(`Multiple candidates`);
+			throw new Error(`Unexpected number of candidates: ${candidates.length} (should be 1)`);
 		}
 		const result = candidates[0];
 		const index = sampleDigits.indexOf(result);
@@ -69,11 +69,8 @@ function recoverOutputValue(sampleDigits: string[], outputDigits: string[], debu
 	// 5 is the one that differs from 6 by one character, which is e
 	let e;
 	const abdfg = pickAndRemove(digit => {
-		if (digit.length !== 5) {
-			return false;
-		}
-		const [common, different] = split(digit, abdefg);
-		if (common.length !== 5 || different.length !== 1) {
+		const [, different] = split(digit, abdefg);
+		if (different.length !== 1) {
 			return false;
 		}
 		e = different;
@@ -91,7 +88,7 @@ function recoverOutputValue(sampleDigits: string[], outputDigits: string[], debu
 	// 0 is the one with length 6 that isn't 9 or 6
 	const abcefg = pickAndRemove(digit => digit.length === 6);
 
-	// 3 has a difference of 1 to 9, which is b
+	// 3 has a single difference to 9, which is b
 	let b;
 	const acdfg = pickAndRemove(digit => {
 		const [, different ] = split(digit, abcdfg);
@@ -104,10 +101,6 @@ function recoverOutputValue(sampleDigits: string[], outputDigits: string[], debu
 
 	// 2 is the one that is left over
 	const acdefg = pickAndRemove(() => true);
-
-	if (sampleDigits.length !== 0) {
-		throw new Error(`Huh? Left over: ${sampleDigits.join(',')}`);
-	}
 
 	// Build the magic mapping
 	// The keys are the inputs, but with the segments sorted, so that the lookup can just pick
@@ -137,7 +130,7 @@ function recoverOutputValue(sampleDigits: string[], outputDigits: string[], debu
 	let power = 1;
 	for (let i = outputDigits.length - 1; i >= 0; i--) {
 		const digit = outputDigits[i];
-		result += getMapping(digit)! * power;
+		result += getMapping(digit) * power;
 		power *= 10;
 	}
 	return result;
