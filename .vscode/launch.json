@@ -11,7 +11,7 @@
             "skipFiles": [
                 "<node_internals>/**"
             ],
-            "program": "${workspaceFolder}/2021/day-8.ts",
+            "program": "${workspaceFolder}/2021/day-9.ts",
             "preLaunchTask": "npm: build",
             "outFiles": [
                 "${workspaceFolder}/out/**/*.js"
