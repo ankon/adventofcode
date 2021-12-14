@@ -11,6 +11,13 @@ const SYNTAX_ERROR_SCORE: Record<string, number> = {
 	'>': 25137,
 };
 
+const AUTOCOMPLETE_SCORE: Record<string, number> = {
+	')': 1,
+	']': 2,
+	'}': 3,
+	'>': 4,
+};
+
 const PAIR_MAPPING: Record<string, string> = {
 	'(': ')',
 	'[': ']',
@@ -18,11 +25,21 @@ const PAIR_MAPPING: Record<string, string> = {
 	'<': '>',
 };
 
+function scoreAutoComplete(symbolStack: string[]) {
+	let result = 0;
+	let symbol;
+	while ((symbol = symbolStack.pop())) {
+		result *= 5;
+		result += AUTOCOMPLETE_SCORE[symbol];
+	}
+	return result;
+}
+
 /**
  * Check the line for syntax errors
  *
- * Returns an index into the line for the first syntax error, or `0` if the line is syntactically
- * fine, or `-1` when the line is incomplete.
+ * Returns the score of the syntax error, or `0` if the line is syntactically
+ * fine, or the negative score of the autocompletion when the line is incomplete.
  *
  * @param line
  */
@@ -54,39 +71,43 @@ function syntaxCheck(line: string): number {
 		return 0;
 	} else {
 		// Something is still open, so the line is incomplete.
-		return -1;
+		return -scoreAutoComplete(expectedNextClosing);
 	}
 }
 
 function processInput(input: string): Promise<void> {
 	const rl = createInterface(createReadStream(input));
 
-	const completeLines: string[] = [];
-	const incompleteLines: string[] = [];
 	let syntaxErrorScore = 0;
+	let autoCompleteScores: number[] = [];
 
 	return new Promise((resolve, reject) => {
 		rl.on('line', (line) => {
 			// Process `line` here
 			const s = syntaxCheck(line);
-			switch (s) {
-				case 0:
-					completeLines.push(line);
-					break;
-				case -1:
-					incompleteLines.push(line);
-					break;
-				default:
-					syntaxErrorScore += s;
-					break;
+			if (s === 0) {
+				// Complete, we don't care.
+				return;
+			}
+			if (s < 0) {
+				// Incomplete
+				autoCompleteScores.push(-s);
+			} else {
+				// Error
+				syntaxErrorScore += s;
 			}
 		});
 		rl.on('error', (err) => {
 			reject(err);
 		});
 		rl.on('close', () => {
+			autoCompleteScores.sort((a, b) => a - b);
 			console.log(
-				`Results for ${input}: syntax error score ${syntaxErrorScore}`
+				`Results for ${input}: syntax error score ${syntaxErrorScore}, auto complete score ${
+					autoCompleteScores[
+						Math.floor(autoCompleteScores.length / 2)
+					]
+				}`
 			);
 			resolve();
 		});
