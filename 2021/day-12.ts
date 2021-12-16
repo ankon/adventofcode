@@ -10,10 +10,48 @@ const END = 'end';
 type DiGraph = Record<string, string[]>;
 type Path = string;
 
-function canGoInto(visitedCaves: string[], cave: string): boolean {
+function canGoIntoPart1(visitedCaves: string[], cave: string): boolean {
 	return cave.toLowerCase() === cave ? !visitedCaves.includes(cave) : true;
 }
-function countPaths(graph: DiGraph, openPaths: Set<Path>): number {
+
+function canGoIntoPart2(visitedCaves: string[], cave: string): boolean {
+	if (cave === START) {
+		// No need to check, we came from there
+		return false;
+	} else if (cave === END) {
+		// Fine to go into, and we know the caller won't ask again
+		return true;
+	} else if (cave.toUpperCase() === cave) {
+		return true;
+	}
+
+	// small cave, check whether the invariant requested still holds: At most
+	// one small cave visited twice.
+	const counters: Record<string, number> = { [cave]: 1 };
+	let seenDoubleVisit = false;
+	for (const visitedCave of visitedCaves) {
+		if (visitedCave.toUpperCase() === visitedCave) {
+			continue;
+		}
+		const newCount = (counters[visitedCave] ?? 0) + 1;
+		counters[visitedCave] = newCount;
+
+		// Can be 3 if we have a double visit for the requested cave already
+		if (newCount >= 2) {
+			if (seenDoubleVisit) {
+				return false;
+			}
+			seenDoubleVisit = true;
+		}
+	}
+	return true;
+}
+
+function countPaths(
+	graph: DiGraph,
+	openPaths: Set<Path>,
+	canGoInto = canGoIntoPart1
+): number {
 	let result = 0;
 	let closedPaths: Set<Path> = new Set();
 
@@ -74,7 +112,10 @@ function processInput(input: string): Promise<void> {
 		});
 		rl.on('close', () => {
 			const paths = countPaths(graph, new Set([START]));
-			console.log(`Results for ${input}: ${paths} paths`);
+			const pathsP2 = countPaths(graph, new Set([START]), canGoIntoPart2);
+			console.log(
+				`Results for ${input}: ${paths} paths (${pathsP2} for variant 2)`
+			);
 			resolve();
 		});
 	});
@@ -92,9 +133,9 @@ async function main(inputFiles: string[]) {
 
 const INPUT_SPECS = [
 	//
-	// '-example-1',
-	// '-example-2',
-	// '-example-3',
+	'-example-1',
+	'-example-2',
+	'-example-3',
 	'',
 ];
 
