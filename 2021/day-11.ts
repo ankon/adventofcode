@@ -76,7 +76,7 @@ function simulate(field: number[][], steps: number = 100): number {
 		workField = simulateStep(workField);
 
 		// A octopus with energy 0 has just flashed, so count those.
-		flashes += workField.reduce(
+		const newFlashes = workField.reduce(
 			(result, row) =>
 				result +
 				row.reduce(
@@ -85,6 +85,12 @@ function simulate(field: number[][], steps: number = 100): number {
 				),
 			0
 		);
+		if (newFlashes === workField.length * workField[0].length) {
+			console.log(`Step ${step}: Everyone flashed!`);
+			printField(workField);
+			break;
+		}
+		flashes += newFlashes;
 
 		if (step < 10 || step % 10 === 0) {
 			console.log(`After step ${step}:`);
@@ -111,6 +117,7 @@ function processInput(input: string): Promise<void> {
 		rl.on('close', () => {
 			const flashes = simulate(field, 100);
 			console.log(`Results for ${input}: ${flashes} flashes`);
+			simulate(field, 5000);
 			resolve();
 		});
 	});
