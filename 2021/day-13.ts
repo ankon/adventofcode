@@ -131,10 +131,12 @@ function processInput(input: string): Promise<void> {
 				maxCol,
 			});
 			console.log(`Results for ${input}: ${afterFirstFold.length} dots`);
-			if (input === '-example') {
-				// Debug side-effect: Print the complete folding result.
-				applyFold(afterFirstFold, folds[1], { maxRow, maxCol });
+
+			let workDots = afterFirstFold;
+			for (const fold of folds.slice(1)) {
+				workDots = applyFold(workDots, fold, { maxRow, maxCol });
 			}
+			printDots('final', workDots, { maxRow, maxCol });
 			resolve();
 		});
 	});
