@@ -34,6 +34,7 @@ function processTemplate(
 	// When processing we look at each pair. Either it matches a rule, in which case it produces (up to) two pairs, otherwise it gets copied literally.
 	// When counting characters we walk over all pairs, and count just the first character. As the last character of the input would not be recognizable
 	// then, we introduce an additional character at the end to make a pair out of that, too.
+	// Alternative approach: The last character will never change, so we could also simply bump the final counters by one for the last character.
 
 	let state: State = {};
 
