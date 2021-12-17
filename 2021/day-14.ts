@@ -90,8 +90,11 @@ function processInput(input: string): Promise<void> {
 			reject(err);
 		});
 		rl.on('close', () => {
-			const indicator = processTemplate(template, rules, 10);
-			console.log(`Results for ${input}: ${indicator}`);
+			const indicatorPart1 = processTemplate(template, rules, 10);
+			const indicatorPart2 = processTemplate(template, rules, 40);
+			console.log(
+				`Results for ${input}: after 10 iterations = ${indicatorPart1}, after 40 iterations = ${indicatorPart2}`
+			);
 			resolve();
 		});
 	});
