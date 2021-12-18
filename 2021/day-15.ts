@@ -4,7 +4,8 @@ import { createReadStream } from 'fs';
 import { basename, extname } from 'path';
 import { createInterface } from 'readline';
 
-const DEBUG = process.env.DEBUG ?? false;
+const PRINT_MAZE = process.env.PRINT_MAZE ?? false;
+const COLUMNS = parseInt(process.env.COLUMNS ?? '80', 10);
 
 type Pos = [row: number, col: number];
 
@@ -19,8 +20,25 @@ interface Node {
 	path: Pos[];
 }
 
-function printMaze(maze: Maze, open: Node[], closed: Node[], path?: Pos[]) {
-	if (!DEBUG) {
+function costAt(maze: Maze, [row, col]: Pos): number {
+	const l = maze.length;
+	const firstTileRow = row % l;
+	const firstTileCol = col % l;
+	const firstTileCost = maze[firstTileRow][firstTileCol];
+	return (
+		((firstTileCost + Math.floor(row / l) + Math.floor(col / l) - 1) % 9) +
+		1
+	);
+}
+
+function printMaze(
+	maze: Maze,
+	open: Node[],
+	closed: number[][],
+	[maxRow, maxCol]: Pos,
+	path?: Pos[]
+) {
+	if (!PRINT_MAZE) {
 		return;
 	}
 	// Draw the maze, possibly highlighting the path
@@ -42,20 +60,17 @@ function printMaze(maze: Maze, open: Node[], closed: Node[], path?: Pos[]) {
 		if (isOpen) {
 			return `(${cost})`;
 		}
-		const isClosed =
-			closed.findIndex(
-				({ pos: [row, col] }) => pos[0] === row && pos[1] === col
-			) > -1;
+		const isClosed = closed[pos[0]][pos[1]] !== Number.MAX_SAFE_INTEGER;
 		if (isClosed) {
 			return ` ${cost} `;
 		}
 		return ` ${cost} `;
 	}
 
-	for (let row = 0; row < maze.length; row++) {
+	for (let row = 0; row < maxRow + 1; row++) {
 		let line = '';
-		for (let col = 0; col < maze[row].length; col++) {
-			line += label([row, col], maze[row][col]);
+		for (let col = 0; col < maxCol + 1; col++) {
+			line += label([row, col], costAt(maze, [row, col]));
 		}
 		console.log(line);
 	}
@@ -94,15 +109,13 @@ function estimateCost(
  * Find the cheapest path from `from` to `to` and return the cost of that
  *
  * @param maze
- * @param from
- * @param to
  */
 function findPath(
 	maze: Maze,
-	from: Pos,
 	to: Pos,
 	costPerStepEstimate: (path: Pos[], maze: Maze) => number
 ): number {
+	const from: Pos = [0, 0];
 	const open: Node[] = [
 		{
 			pos: from,
@@ -117,7 +130,10 @@ function findPath(
 			path: [from],
 		},
 	];
-	const closed: Node[] = [];
+	const closed: number[][] = [];
+	for (let row = 0; row < to[0] + 1; row++) {
+		closed.push(new Array(to[1] + 1).fill(Number.MAX_SAFE_INTEGER));
+	}
 
 	let steps = 0;
 	while (open.length > 0) {
@@ -132,10 +148,18 @@ function findPath(
 		);
 		const cheapest = open.splice(cheapestIndex, 1)[0];
 
-		printMaze(maze, open, closed, cheapest.path);
-		console.debug(
-			`After ${steps} steps: ${cheapest.path.length} length, ${cheapest.cost} so far, ${cheapest.estimatedCost} still to go`
-		);
+		if (steps % 1000 === 0) {
+			printMaze(
+				maze,
+				open,
+				closed,
+				[Math.min(to[0], 25), Math.min(to[1], COLUMNS)],
+				cheapest.path
+			);
+			console.debug(
+				`After ${steps} steps: ${cheapest.path.length} length, ${cheapest.cost} so far, ${cheapest.estimatedCost} still to go`
+			);
+		}
 		steps++;
 
 		// Generate the successors (non-diagonal)
@@ -151,16 +175,15 @@ function findPath(
 			];
 			if (
 				successorPos[0] < 0 ||
-				successorPos[0] >= maze.length ||
+				successorPos[0] > to[0] ||
 				successorPos[1] < 0 ||
-				successorPos[1] >= maze.length
+				successorPos[1] > to[1]
 			) {
 				// Not on the map
 				continue;
 			}
 
-			const successorCost =
-				cheapest.cost + maze[successorPos[0]][successorPos[1]];
+			const successorCost = cheapest.cost + costAt(maze, successorPos);
 			// 1. hit the end? then this must be the cheapest path
 			if (successorPos[0] === to[0] && successorPos[1] === to[1]) {
 				console.log(`Path at ${successorCost}`, cheapest.path);
@@ -204,15 +227,9 @@ function findPath(
 				}
 				continue;
 			}
-			const closedSuccessorIndex = closed.findIndex(
-				({ pos: p }) =>
-					p[0] === successorPos[0] && p[1] === successorPos[1]
-			);
 			if (
-				closedSuccessorIndex > -1 &&
-				closed[closedSuccessorIndex].cost +
-					closed[closedSuccessorIndex].estimatedCost <=
-					successorCost + successorEstimatedCost
+				closed[successorPos[0]][successorPos[1]] <=
+				successorCost + successorEstimatedCost
 			) {
 				// No point to look at this, we have been here before with a lower cost already.
 				continue;
@@ -223,7 +240,8 @@ function findPath(
 		}
 
 		// Remember that we have been here.
-		closed.push(cheapest);
+		closed[cheapest.pos[0]][cheapest.pos[1]] =
+			cheapest.cost + cheapest.estimatedCost;
 	}
 
 	throw new Error('No open nodes left, but end not found?');
@@ -255,11 +273,17 @@ function processInput(input: string): Promise<void> {
 			// NB: Maze is square by definition
 			const riskLevel = findPath(
 				maze,
-				[0, 0],
 				[maze.length - 1, maze.length - 1],
 				costPerStepEstimate
 			);
-			console.log(`Results for ${input}: ${riskLevel}`);
+			const riskLevelPart2 = findPath(
+				maze,
+				[maze.length * 5 - 1, maze.length * 5 - 1],
+				costPerStepEstimate
+			);
+			console.log(
+				`Results for ${input}: part1 = ${riskLevel}, part2 = ${riskLevelPart2}`
+			);
 
 			resolve();
 		});
@@ -278,7 +302,7 @@ async function main(inputFiles: string[]) {
 
 const INPUT_SPECS = [
 	//
-	//'-example',
+	'-example',
 	'',
 ];
 
