@@ -83,25 +83,30 @@ class Bitstream {
 
 	/**
 	 * Read a literal value
-	 *
-	 * @remarks
-	 * JavaScript bit operations are signed 32bit only, so a '1' in the left-most
-	 * position will produce bad things. This function applies some laziness to be revisited
-	 * if needed later: Calculate the bit string as actual string, and then parse that
-	 * into a number at the end.
 	 */
 	public readLiteralValue() {
+		/** Bit mask for the "has next" bit */
 		const HAS_NEXT_BIT = 1 << 4;
-		let debugBits = '';
-		// For debugging to set conditional breakpoints
-		//let debugStartOffset = this.offset;
+		/**
+		 * Multiplier for each chunk of 4 bits
+		 * Bit operations in JavaScript are signed 32bit operations, so we cannot arbitrarily
+		 * shift left by 4. Instead we replace `(result<<4)|chunk` with `result*MULTIPLIER+chunk`.
+		 */
+		const MULTIPLIER = 1 << 4;
+		let result = 0;
+		// For debugging to set conditional breakpoints and verify the result
+		// let debugStartOffset = this.offset;
+		// let debugBits = '';
 		let hasNext;
 		do {
 			const bits = this.readBits(5);
 			hasNext = (bits & HAS_NEXT_BIT) === HAS_NEXT_BIT;
-			debugBits += (bits & 0xf).toString(2).padStart(4, '0');
+			const chunk = bits & 0xf;
+			result = result * MULTIPLIER + chunk;
+			// debugBits += (bits & 0xf).toString(2).padStart(4, '0');
 		} while (hasNext);
-		return parseInt(debugBits, 2);
+		// assert parseInt(debugBits, 2) === result
+		return result;
 	}
 }
 
