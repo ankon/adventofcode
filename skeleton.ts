@@ -8,10 +8,10 @@ function processInput(input: string): Promise<void> {
 	const rl = createInterface(createReadStream(input));
 
 	return new Promise((resolve, reject) => {
-		rl.on('line', line => {
+		rl.on('line', (line) => {
 			// Process `line` here
 		});
-		rl.on('error', err => {
+		rl.on('error', (err) => {
 			reject(err);
 		});
 		rl.on('close', () => {
