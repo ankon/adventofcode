@@ -68,7 +68,7 @@ class Bitstream {
 
 			const rawBits = byte & mask;
 			const rawBitsShift = 8 - firstBit - consumedBits;
-			result = (result << consumedBits) | (rawBits >> rawBitsShift);
+			result = (result << consumedBits) | (rawBits >>> rawBitsShift);
 		}
 		return result;
 	}
@@ -81,22 +81,39 @@ class Bitstream {
 		return this.readBits(3);
 	}
 
-	/** Read a literal value */
+	/**
+	 * Read a literal value
+	 *
+	 * @remarks
+	 * JavaScript bit operations are signed 32bit only, so a '1' in the left-most
+	 * position will produce bad things. This function applies some laziness to be revisited
+	 * if needed later: Calculate the bit string as actual string, and then parse that
+	 * into a number at the end.
+	 */
 	public readLiteralValue() {
 		const HAS_NEXT_BIT = 1 << 4;
-		let result = 0;
+		let debugBits = '';
+		// For debugging to set conditional breakpoints
+		//let debugStartOffset = this.offset;
 		let hasNext;
 		do {
 			const bits = this.readBits(5);
 			hasNext = (bits & HAS_NEXT_BIT) === HAS_NEXT_BIT;
-			result = (result << 4) | (bits & 0xf);
+			debugBits += (bits & 0xf).toString(2).padStart(4, '0');
 		} while (hasNext);
-		return result;
+		return parseInt(debugBits, 2);
 	}
 }
 
+const PT_OP_SUM = 0;
+const PT_OP_PRODUCT = 1;
+const PT_OP_MIN = 2;
+const PT_OP_MAX = 3;
 /** Known packet type for "literal value" */
 const PT_LITERAL = 4;
+const PT_OP_CMP_GT = 5;
+const PT_OP_CMP_LT = 6;
+const PT_OP_CMP_EQ = 7;
 
 interface Packet {
 	version: number;
@@ -109,6 +126,10 @@ interface LiteralValue extends Packet {
 
 interface Operator extends Packet {
 	operands: Packet[];
+}
+
+interface Comparison extends Omit<Operator, 'operands'> {
+	operands: [left: Packet, right: Packet];
 }
 
 function parse(bitstream: Bitstream): Packet {
@@ -157,6 +178,10 @@ function isOperator(packet: Packet): packet is Operator {
 	return packet.type !== PT_LITERAL;
 }
 
+function isComparison(packet: Operator): packet is Comparison {
+	return [PT_OP_CMP_EQ, PT_OP_CMP_GT, PT_OP_CMP_LT].includes(packet.type);
+}
+
 function calculateVersionSum(packet: Packet): number {
 	if (isLiteralValue(packet)) {
 		return packet.version;
@@ -165,6 +190,83 @@ function calculateVersionSum(packet: Packet): number {
 			packet.version +
 			packet.operands.reduce((s, p) => s + calculateVersionSum(p), 0)
 		);
+	}
+	throw new Error('Unexpected packet');
+}
+
+function calculateOperationValue(packet: Operator): number {
+	if (isComparison(packet)) {
+		let compare: (left: number, right: number) => boolean;
+		switch (packet.type) {
+			case PT_OP_CMP_EQ:
+				compare = (left, right) => left === right;
+				break;
+			case PT_OP_CMP_GT:
+				compare = (left, right) => left > right;
+				break;
+			case PT_OP_CMP_LT:
+				compare = (left, right) => left < right;
+				break;
+			default:
+				throw new Error(`Unexpected comparison ${packet.type}`);
+		}
+		return compare(
+			calculateExpression(packet.operands[0]),
+			calculateExpression(packet.operands[1])
+		)
+			? 1
+			: 0;
+	}
+
+	let reducer: (r: number, o: number) => number;
+	let initial: number;
+	switch (packet.type) {
+		case PT_OP_SUM:
+			reducer = (s, o) => s + o;
+			initial = 0;
+			break;
+		case PT_OP_PRODUCT:
+			reducer = (s, o) => s * o;
+			initial = 1;
+			break;
+		case PT_OP_MIN:
+			reducer = (s, o) => (s < o ? s : o);
+			initial = Number.POSITIVE_INFINITY;
+			break;
+		case PT_OP_MAX:
+			reducer = (s, o) => (s > o ? s : o);
+			initial = Number.NEGATIVE_INFINITY;
+			break;
+		default:
+			throw new Error(`Unexpected operation ${packet.type}`);
+	}
+
+	return packet.operands.map(calculateExpression).reduce(reducer, initial);
+}
+
+function calculateExpression(packet: Packet): number {
+	if (isLiteralValue(packet)) {
+		return packet.value;
+	} else if (isOperator(packet)) {
+		return calculateOperationValue(packet);
+	}
+	throw new Error('Unexpected packet');
+}
+
+function printExpression(packet: Packet): string {
+	if (isLiteralValue(packet)) {
+		return String(packet.value);
+	} else if (isOperator(packet)) {
+		let opName = {
+			[PT_OP_SUM]: 'Sum',
+			[PT_OP_PRODUCT]: 'Product',
+			[PT_OP_MIN]: 'Min',
+			[PT_OP_MAX]: 'Max',
+			[PT_OP_CMP_LT]: 'Lt',
+			[PT_OP_CMP_GT]: 'Gt',
+			[PT_OP_CMP_EQ]: 'Eq',
+		}[packet.type];
+		return `${opName}(${packet.operands.map(printExpression).join(', ')})`;
 	}
 	throw new Error('Unexpected packet');
 }
@@ -186,7 +288,12 @@ function processInput(input: string): Promise<void> {
 		rl.on('close', () => {
 			const packet = parse(new Bitstream(data));
 			const versionSum = calculateVersionSum(packet);
-			console.log(`Results for ${input}: ${versionSum}`);
+			const expressionValue = calculateExpression(packet);
+			console.log(
+				`Results for ${input}: ${printExpression(
+					packet
+				)} = ${expressionValue} (version sum ${versionSum})`
+			);
 
 			resolve();
 		});
@@ -212,13 +319,29 @@ const INPUT_SPECS = [
 	// Op [1, 2, 3]
 	// '-example-operator-LT1',
 	// Version sum 16
-	'-example-1',
+	// '-example-1',
 	// Version sum 12
-	'-example-2',
+	// '-example-2',
 	// Version sum 23
-	'-example-3',
+	// '-example-3',
 	// Version sum 31
-	'-example-4',
+	// '-example-4',
+	// Sum(1, 2)
+	'-example-p2-1',
+	// Product(6, 9)
+	'-example-p2-2',
+	// Min(6, 7, 8)
+	'-example-p2-3',
+	// Max(6, 7, 8)
+	'-example-p2-4',
+	// Lt(5, 15)
+	'-example-p2-5',
+	// Lt(15, 5)
+	'-example-p2-6',
+	// Eq(5, 15)
+	'-example-p2-7',
+	// Eq(Sum(1, 3), Product(2, 2))
+	'-example-p2-8',
 	'',
 ];
 
