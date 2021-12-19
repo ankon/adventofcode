@@ -34,6 +34,7 @@ async function main(inputFiles: string[]) {
 }
 
 const INPUT_SPECS = [
+	//
 	'-example',
 	'',
 ];
