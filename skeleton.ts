@@ -15,8 +15,8 @@ function processInput(input: string): Promise<void> {
 			reject(err);
 		});
 		rl.on('close', () => {
-			console.log(`Results for ${input}:`);
 			// Report results for this input
+			console.log(`Results for ${input}:`);
 
 			resolve();
 		});
