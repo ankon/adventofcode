@@ -3,6 +3,7 @@ package _1
 import (
 	_ "embed"
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 )
@@ -13,14 +14,59 @@ var sampleInput string
 //go:embed input.txt
 var fullInput string
 
-func findHighestCaloriesOnElf(input string) (int, error) {
-    var highest int
+type topN struct {
+    data []int
+}
+
+func makeTopN(n int) topN {
+    data := make([]int, 0, n)
+    return topN{data}
+}
+
+// Insert inserts the given value if it fits (i.e. either there is capacity left, or it is bigger than at least one existing value).
+func (t *topN) Insert(v int) bool {
+    l := len(t.data)
+
+    // Find the insert point
+    at := sort.Search(l, func(i int) bool { return v >= t.data[i] })
+
+    // If we get the end of the array, check whether we still have capacity.
+    if at == l {
+        if l < cap(t.data) {
+            t.data = append(t.data, v)
+            return true
+        } else {
+            return false
+        }
+    }
+
+    // We might not be using all of the capacity yet, expand the array
+    dropAtEnd := 1
+    if l < cap(t.data) {
+        t.data = append(t.data, 0)
+        dropAtEnd = 0
+    }
+
+    // Shift things if the insert point is not at the end
+    shiftLen := l - at - dropAtEnd
+    if shiftLen > 0 {
+        copy(t.data[at+1:at+1+shiftLen], t.data[at:at+shiftLen])
+    }
+    t.data[at] = v
+    return true
+}
+
+func (t *topN) Iterate() []int {
+    return t.data
+}
+
+func findHighestCaloriesOnElf(input string, n int) (int, error) {
+    topN := makeTopN(n)
+
     var current int
     for _, line := range strings.Split(input, "\n") {
         if line == "" {
-            if current > highest {
-                highest = current
-            }
+            topN.Insert(current)
             current = 0
         } else {
             calories, err := strconv.ParseInt(line, 0, 0)
@@ -30,7 +76,12 @@ func findHighestCaloriesOnElf(input string) (int, error) {
             current += int(calories)
         }
     }
-    return highest, nil
+
+    result := 0
+    for _, calories := range topN.Iterate() {
+        result += calories
+    }
+    return result, nil
 }
 
 func pickInput(useSampleInput bool) string {
@@ -43,10 +94,16 @@ func pickInput(useSampleInput bool) string {
 
 func Run(useSampleInput bool) {
     input := pickInput(useSampleInput)
-    highest, err := findHighestCaloriesOnElf(input)
+
+    highest, err := findHighestCaloriesOnElf(input, 1)
     if err != nil {
         panic(err)
     }
-
     fmt.Printf("Highest calorie count on an elf: %d\n", highest)
+
+    highest3, err := findHighestCaloriesOnElf(input, 3)
+    if err != nil {
+        panic(err)
+    }
+    fmt.Printf("Sum of the 3 highest calorie counts on an elf: %d\n", highest3)
 }
