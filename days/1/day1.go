@@ -30,14 +30,9 @@ func (t *topN) Insert(v int) bool {
     // Find the insert point
     at := sort.Search(l, func(i int) bool { return v >= t.data[i] })
 
-    // If we get the end of the array, check whether we still have capacity.
-    if at == l {
-        if l < cap(t.data) {
-            t.data = append(t.data, v)
-            return true
-        } else {
-            return false
-        }
+    // No space to add it, and not big enough to shift something out.
+    if at == cap(t.data) {
+        return false
     }
 
     // We might not be using all of the capacity yet, expand the array
