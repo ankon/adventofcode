@@ -1,9 +1,0 @@
-{
-	"extends": "tsconfig-collaborne",
-	"compilerOptions": {
-		"outDir": "out",
-		"lib": [
-			"ES2019"
-		]
-	}
-}

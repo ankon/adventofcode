@@ -1,5 +1,8 @@
 {
     "editor.formatOnSave": true,
     "editor.formatOnSaveMode": "modificationsIfAvailable",
-    "editor.defaultFormatter": "esbenp.prettier-vscode"
+    "[go]": {
+        "editor.insertSpaces": true,
+        "editor.defaultFormatter": "golang.go"
+    },
 }
