@@ -26,5 +26,3 @@ func Execute() {
 func init() {
 	rootCmd.PersistentFlags().BoolVar(&useSampleInput, "sample", true, "Use the sample input for the day")
 }
-
-
