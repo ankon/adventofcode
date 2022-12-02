@@ -5,12 +5,23 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Day 1",
+            "name": "Sample",
             "type": "go",
             "mode": "debug",
             "request": "launch",
             "args": [
-                "day1",
+                "day2",
+                "--sample=true"
+            ],
+            "program": "${workspaceFolder}"
+        },
+        {
+            "name": "Full",
+            "type": "go",
+            "mode": "debug",
+            "request": "launch",
+            "args": [
+                "day2",
                 "--sample=false"
             ],
             "program": "${workspaceFolder}"
