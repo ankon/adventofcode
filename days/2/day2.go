@@ -20,19 +20,47 @@ func pickInput(useSampleInput bool) string {
 	}
 }
 
-var roundValue = map[string]int{
-	"A X": 3 + 1,
-	"A Y": 6 + 2,
-	"A Z": 0 + 3,
-	"B X": 0 + 1,
-	"B Y": 3 + 2,
-	"B Z": 6 + 3,
-	"C X": 6 + 1,
-	"C Y": 0 + 2,
-	"C Z": 3 + 3,
+type shape int
+
+const (
+	Rock     shape = 1
+	Paper    shape = 2
+	Scissors shape = 3
+)
+
+type outcome int
+
+const (
+	Lose outcome = 0
+	Draw outcome = 3
+	Win  outcome = 6
+)
+
+var roundValueSimpleTheory = map[string]int{
+	"A X": int(Draw) + int(Rock),
+	"A Y": int(Win) + int(Paper),
+	"A Z": int(Lose) + int(Scissors),
+	"B X": int(Lose) + int(Rock),
+	"B Y": int(Draw) + int(Paper),
+	"B Z": int(Win) + int(Scissors),
+	"C X": int(Win) + int(Rock),
+	"C Y": int(Lose) + int(Paper),
+	"C Z": int(Draw) + int(Scissors),
 }
 
-func simulateGame(rounds []string) (int, error) {
+var roundValueActualMeaning = map[string]int{
+	"A X": int(Lose) + int(Scissors),
+	"A Y": int(Draw) + int(Rock),
+	"A Z": int(Win) + int(Paper),
+	"B X": int(Lose) + int(Rock),
+	"B Y": int(Draw) + int(Paper),
+	"B Z": int(Win) + int(Scissors),
+	"C X": int(Lose) + int(Paper),
+	"C Y": int(Draw) + int(Scissors),
+	"C Z": int(Win) + int(Rock),
+}
+
+func simulateGame(rounds []string, roundValue map[string]int) (int, error) {
 	var score int
 	for _, round := range rounds {
 		if round == "" {
@@ -46,11 +74,17 @@ func simulateGame(rounds []string) (int, error) {
 
 func Run(useSampleInput bool) {
 	input := pickInput(useSampleInput)
-
 	rounds := strings.Split(input, "\n")
-	score, err := simulateGame(rounds)
+
+	assumedScore, err := simulateGame(rounds, roundValueSimpleTheory)
 	if err != nil {
 		panic(err)
 	}
-	fmt.Printf("Score according to guide: %d\n", score)
+	fmt.Printf("Score according to theory about guide: %d\n", assumedScore)
+
+	actualScore, err := simulateGame(rounds, roundValueActualMeaning)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Printf("Score according to actual meaning of guide: %d\n", actualScore)
 }
