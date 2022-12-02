@@ -2,7 +2,6 @@
     "editor.formatOnSave": true,
     "editor.formatOnSaveMode": "modificationsIfAvailable",
     "[go]": {
-        "editor.insertSpaces": true,
         "editor.defaultFormatter": "golang.go"
     },
 }
