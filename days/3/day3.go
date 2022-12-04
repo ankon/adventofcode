@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/ankon/adventofcode/2022/days"
 	"golang.org/x/exp/slices"
 )
 
@@ -75,16 +76,9 @@ var sampleInput string
 //go:embed input.txt
 var fullInput string
 
-func pickInput(useSampleInput bool) string {
-	if useSampleInput {
-		return sampleInput
-	} else {
-		return fullInput
-	}
-}
-
 func Run(useSampleInput bool) {
-	input := pickInput(useSampleInput)
+	input := days.PickInput(useSampleInput, sampleInput, fullInput)
+
 	rucksacks := strings.Split(input, "\n")
 	prioritySum, err := calculateMispackedItemInCompartmentsPrioritySum(rucksacks)
 	if err != nil {

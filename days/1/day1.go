@@ -6,6 +6,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/ankon/adventofcode/2022/days"
 )
 
 //go:embed sample.txt
@@ -79,16 +81,9 @@ func findHighestCaloriesOnElf(input string, n int) (int, error) {
 	return result, nil
 }
 
-func pickInput(useSampleInput bool) string {
-	if useSampleInput {
-		return sampleInput
-	} else {
-		return fullInput
-	}
-}
 
 func Run(useSampleInput bool) {
-	input := pickInput(useSampleInput)
+	input := days.PickInput(useSampleInput, sampleInput, fullInput)
 
 	highest, err := findHighestCaloriesOnElf(input, 1)
 	if err != nil {

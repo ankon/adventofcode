@@ -4,6 +4,8 @@ import (
 	_ "embed"
 	"fmt"
 	"strings"
+
+	"github.com/ankon/adventofcode/2022/days"
 )
 
 //go:embed sample.txt
@@ -11,14 +13,6 @@ var sampleInput string
 
 //go:embed input.txt
 var fullInput string
-
-func pickInput(useSampleInput bool) string {
-	if useSampleInput {
-		return sampleInput
-	} else {
-		return fullInput
-	}
-}
 
 type shape int
 
@@ -73,7 +67,8 @@ func simulateGame(rounds []string, roundValue map[string]int) (int, error) {
 }
 
 func Run(useSampleInput bool) {
-	input := pickInput(useSampleInput)
+	input := days.PickInput(useSampleInput, sampleInput, fullInput)
+
 	rounds := strings.Split(input, "\n")
 
 	assumedScore, err := simulateGame(rounds, roundValueSimpleTheory)
