@@ -42,10 +42,27 @@ func rangeFullyContains(r1, r2 []int) bool {
 	return false
 }
 
+func rangeOverlaps(r1, r2 []int) bool {
+	if r1[0] <= r2[0] && r1[1] >= r2[0] {
+		return true
+	}
+	if r1[0] <= r2[1] && r1[1] >= r2[1] {
+		return true
+	}
+	if r2[0] <= r1[0] && r2[1] >= r1[1] {
+		return true
+	}
+	if r2[0] <= r1[1] && r2[1] >= r1[1] {
+		return true
+	}
+	return false
+}
+
 func Run(useSampleInput bool) error {
 	input := days.PickInput(useSampleInput, sampleInput, fullInput)
 
-	count := 0
+	containedCount := 0
+	overlapCount := 0
 	for _, pair := range strings.Split(input, "\n") {
 		if pair == "" {
 			continue
@@ -63,10 +80,14 @@ func Run(useSampleInput bool) error {
 			return fmt.Errorf("cannot parse range %q: %w", r2, err)
 		}
 		if rangeFullyContains(range1, range2) {
-			count++
+			containedCount++
+		}
+		if rangeOverlaps(range1, range2) {
+			overlapCount++
 		}
 	}
-	fmt.Printf("Pairs with fully overlapping ranges: %d\n", count)
+	fmt.Printf("Pairs with fully contained ranges: %d\n", containedCount)
+	fmt.Printf("Pairs with overlapping ranges: %d\n", overlapCount)
 
 	return nil
 }
