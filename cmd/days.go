@@ -6,6 +6,7 @@ import (
 	day1 "github.com/ankon/adventofcode/2022/days/1"
 	day2 "github.com/ankon/adventofcode/2022/days/2"
 	day3 "github.com/ankon/adventofcode/2022/days/3"
+	day4 "github.com/ankon/adventofcode/2022/days/4"
 
 	"github.com/spf13/cobra"
 )
@@ -20,7 +21,7 @@ var days = []day{
 	{"Calorie Counting", day1.Run},
 	{"Rock Paper Scissors", day2.Run},
 	{"Rucksack Reorganization", day3.Run},
-
+	{"Camp Cleanup", day4.Run},
 }
 
 func init() {
