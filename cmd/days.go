@@ -18,7 +18,7 @@ var day1Cmd = &cobra.Command{
 
 var day2Cmd = &cobra.Command{
 	Use:   "day2",
-	Short: "Rock Paper Scissor",
+	Short: "Rock Paper Scissors",
 	Run: func(cmd *cobra.Command, args []string) {
 		day2.Run(useSampleInput)
 	},
