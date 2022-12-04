@@ -4,35 +4,67 @@ import (
 	_ "embed"
 	"fmt"
 	"strings"
-	"unicode"
+
+	"golang.org/x/exp/slices"
 )
 
-func findCommonItem(compartment1, compartment2 string) (rune, error) {
+func findCommonItem(compartment1, compartment2 []byte) (byte, error) {
 	for _, c := range compartment2 {
-		if strings.ContainsRune(compartment1, c) {
+		if slices.Contains(compartment1, c) {
 			return c, nil
 		}
 	}
-	return -1, fmt.Errorf("no common item")
+	return 0, fmt.Errorf("no common item")
 }
 
-func calculatePrioritySum(rucksacks []string) (int, error) {
-	var sum int
+func getPriority(item byte) int {
+	if item >= 'A' && item <= 'Z' {
+		return int(item - 'A') + 27
+	} else {
+		return int(item - 'a') + 1
+	}
+}
+
+func calculateMispackedItemInCompartmentsPrioritySum(rucksacks []string) (int, error) {
+	sum := 0
 	for _, rucksack := range rucksacks {
-		if rucksack == "" {
+		if len(rucksack) == 0 {
 			continue
 		}
+
 		l := len(rucksack)
 		compartment1, compartment2 := rucksack[0:l/2], rucksack[l/2:]
-		commonItem, err := findCommonItem(compartment1, compartment2)
+		commonItem, err := findCommonItem([]byte(compartment1), []byte(compartment2))
 		if err != nil {
 			return 0, fmt.Errorf("cannot find common item for %q: %w", rucksack, err)
 		}
-		if unicode.IsUpper(commonItem) {
-			sum += int(commonItem - 'A') + 27
-		} else {
-			sum += int(commonItem - 'a') + 1
+		sum += getPriority(commonItem)
+	}
+	return sum, nil
+}
+
+func commonItemTypes(list1, list2 []byte) []byte {
+	result := []byte{}
+	for _, c := range list2 {
+		if slices.Contains(result, c) {
+			continue
 		}
+		if slices.Contains(list1, c) {
+			result = append(result, c)
+		}
+	}
+	return result
+}
+
+func calculateGroupBadgeItemPrioritySum(rucksacks []string) (int, error) {
+	sum := 0
+	for i := 0; i + 3 < len(rucksacks); i += 3 {
+		common1 := commonItemTypes([]byte(rucksacks[i]), []byte(rucksacks[i+1]))
+		common := commonItemTypes(common1, []byte(rucksacks[i+2]))
+		if len(common) != 1 {
+			return 0, fmt.Errorf("expected only one common item, but got %q", common)
+		}
+		sum += getPriority(common[0])
 	}
 	return sum, nil
 }
@@ -54,9 +86,15 @@ func pickInput(useSampleInput bool) string {
 func Run(useSampleInput bool) {
 	input := pickInput(useSampleInput)
 	rucksacks := strings.Split(input, "\n")
-	prioritySum, err := calculatePrioritySum(rucksacks)
+	prioritySum, err := calculateMispackedItemInCompartmentsPrioritySum(rucksacks)
 	if err != nil {
 		panic(err)
 	}
 	fmt.Printf("Sum of priorities: %d\n", prioritySum)
+
+	groupBadgePrioritySym, err := calculateGroupBadgeItemPrioritySum(rucksacks)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Printf("Group badge priority sum: %d\n", groupBadgePrioritySym)
 }
