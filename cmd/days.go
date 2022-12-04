@@ -3,6 +3,7 @@ package cmd
 import (
 	day1 "github.com/ankon/adventofcode/2022/days/1"
 	day2 "github.com/ankon/adventofcode/2022/days/2"
+	day3 "github.com/ankon/adventofcode/2022/days/3"
 
 	"github.com/spf13/cobra"
 )
@@ -23,7 +24,16 @@ var day2Cmd = &cobra.Command{
 	},
 }
 
+var day3Cmd = &cobra.Command{
+	Use:   "day3",
+	Short: "Rucksack Reorganization",
+	Run: func(cmd *cobra.Command, args []string) {
+		day3.Run(useSampleInput)
+	},
+}
+
 func init() {
 	rootCmd.AddCommand(day1Cmd)
 	rootCmd.AddCommand(day2Cmd)
+	rootCmd.AddCommand(day3Cmd)
 }
