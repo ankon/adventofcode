@@ -82,18 +82,20 @@ func findHighestCaloriesOnElf(input string, n int) (int, error) {
 }
 
 
-func Run(useSampleInput bool) {
+func Run(useSampleInput bool) error {
 	input := days.PickInput(useSampleInput, sampleInput, fullInput)
 
 	highest, err := findHighestCaloriesOnElf(input, 1)
 	if err != nil {
-		panic(err)
+		return err
 	}
 	fmt.Printf("Highest calorie count on an elf: %d\n", highest)
 
 	highest3, err := findHighestCaloriesOnElf(input, 3)
 	if err != nil {
-		panic(err)
+		return err
 	}
 	fmt.Printf("Sum of the 3 highest calorie counts on an elf: %d\n", highest3)
+	
+	return nil
 }

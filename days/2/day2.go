@@ -66,20 +66,22 @@ func simulateGame(rounds []string, roundValue map[string]int) (int, error) {
 	return score, nil
 }
 
-func Run(useSampleInput bool) {
+func Run(useSampleInput bool) error {
 	input := days.PickInput(useSampleInput, sampleInput, fullInput)
 
 	rounds := strings.Split(input, "\n")
 
 	assumedScore, err := simulateGame(rounds, roundValueSimpleTheory)
 	if err != nil {
-		panic(err)
+		return err
 	}
 	fmt.Printf("Score according to theory about guide: %d\n", assumedScore)
 
 	actualScore, err := simulateGame(rounds, roundValueActualMeaning)
 	if err != nil {
-		panic(err)
+		return err
 	}
 	fmt.Printf("Score according to actual meaning of guide: %d\n", actualScore)
+
+	return nil
 }

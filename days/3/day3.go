@@ -76,19 +76,21 @@ var sampleInput string
 //go:embed input.txt
 var fullInput string
 
-func Run(useSampleInput bool) {
+func Run(useSampleInput bool) error {
 	input := days.PickInput(useSampleInput, sampleInput, fullInput)
 
 	rucksacks := strings.Split(input, "\n")
 	prioritySum, err := calculateMispackedItemInCompartmentsPrioritySum(rucksacks)
 	if err != nil {
-		panic(err)
+		return err
 	}
 	fmt.Printf("Sum of priorities: %d\n", prioritySum)
 
 	groupBadgePrioritySym, err := calculateGroupBadgeItemPrioritySum(rucksacks)
 	if err != nil {
-		panic(err)
+		return err
 	}
 	fmt.Printf("Group badge priority sum: %d\n", groupBadgePrioritySym)
+
+	return nil
 }
