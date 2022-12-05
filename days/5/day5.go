@@ -29,6 +29,12 @@ func (s *stack) Push(x byte) {
 	s.crates = append(s.crates, x)
 }
 
+func (s *stack) Clone() stack {
+	result := stack{}
+	result.crates = append(result.crates, s.crates...)
+	return result
+}
+
 type action struct {
 	from int
 	to   int
@@ -47,11 +53,31 @@ var sampleInput string
 //go:embed input.txt
 var fullInput string
 
-func simulateActions(stacks []stack, actions []action) error {
+func simulateActionsCrateMover9000(stacks []stack, actions []action) error {
 	for _, action := range actions {
 		for i := 0; i < action.count; i++ {
 			x := stacks[action.from - 1].Pop()
 			stacks[action.to - 1].Push(x)
+		}
+	}
+	return nil
+}
+
+func simulateActionsCrateMover9001(stacks []stack, actions []action) error {
+	for _, action := range actions {
+		if action.count == 1 {
+			x := stacks[action.from - 1].Pop()
+			stacks[action.to - 1].Push(x)
+		} else {
+			helper := stack{}
+			for i := 0; i < action.count; i++ {
+				x := stacks[action.from - 1].Pop()
+				helper.Push(x)
+			}
+			for i := 0; i < action.count; i++ {
+				x := helper.Pop()
+				stacks[action.to - 1].Push(x)
+			}
 		}
 	}
 	return nil
@@ -126,22 +152,39 @@ func parseInput(input string) (stacks []stack, actions []action, err error) {
 	return stacks, actions, nil
 }
 
+func getTopCrates(stacks []stack) string {
+	result := ""
+	for _, stack := range stacks {
+		result += string(stack.Top())
+	}
+	return result
+}
+
 func Run(useSampleInput bool) error {
 	input := days.PickInput(useSampleInput, sampleInput, fullInput)
-	stacks, actions, err := parseInput(input)
+	inputStacks, actions, err := parseInput(input)
 	if err != nil {
 		return fmt.Errorf("cannot parse input: %w", err)
 	}
-	err = simulateActions(stacks, actions)
+
+	stacks := make([]stack, len(inputStacks))
+	for i, stack := range inputStacks {
+		stacks[i] = stack.Clone()
+	}
+	err = simulateActionsCrateMover9000(stacks, actions)
 	if err != nil {
 		return fmt.Errorf("cannot simulate actions: %w", err)
 	}
+	fmt.Printf("Top crates (CrateMover 9000): %s\n", getTopCrates(stacks))
 
-	topCrates := ""
-	for _, stack := range stacks {
-		topCrates += string(stack.Top())
+	for i, stack := range inputStacks {
+		stacks[i] = stack.Clone()
 	}
-	fmt.Printf("Top crates: %s\n", topCrates)
+	err = simulateActionsCrateMover9001(stacks, actions)
+	if err != nil {
+		return fmt.Errorf("cannot simulate actions: %w", err)
+	}
+	fmt.Printf("Top crates (CrateMover 9001): %s\n", getTopCrates(stacks))
 
 	return nil
 }
