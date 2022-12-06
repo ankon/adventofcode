@@ -2,12 +2,14 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 
 	day1 "github.com/ankon/adventofcode/2022/days/1"
 	day2 "github.com/ankon/adventofcode/2022/days/2"
 	day3 "github.com/ankon/adventofcode/2022/days/3"
 	day4 "github.com/ankon/adventofcode/2022/days/4"
 	day5 "github.com/ankon/adventofcode/2022/days/5"
+	day6 "github.com/ankon/adventofcode/2022/days/6"
 
 	"github.com/spf13/cobra"
 )
@@ -24,6 +26,7 @@ var days = []day{
 	{"Rucksack Reorganization", day3.Run},
 	{"Camp Cleanup", day4.Run},
 	{"Supply Stacks", day5.Run},
+	{"Tuning Trouble", day6.Run},
 }
 
 func init() {
