@@ -32,7 +32,11 @@ func init() {
 			Use:   fmt.Sprintf("day%d", index + 1),
 			Short: day.short,
 			Run: func(cmd *cobra.Command, args []string) {
-				day.run(useSampleInput)
+				err := day.run(useSampleInput)
+				if err != nil {
+					fmt.Printf("Error: %v", err)
+					os.Exit(1)
+				}
 			},
 		}
 		rootCmd.AddCommand(cmd)
