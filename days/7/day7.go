@@ -127,13 +127,13 @@ func loadFS(input string) (root direntry, err error) {
 }
 
 func printDir(de *direntry, indent int) {
-	fmt.Printf("%*s %8s\n", indent, "", de.name)
+	fmt.Printf("%*s- %s\n", indent, "", de.name)
 	for _, child := range de.children {
 		switch child.ftype {
 		case dir:
 			printDir(&child, indent+2)
 		case file:
-			fmt.Printf("%*s %8s %d\n", indent+2, "", child.name, child.size)
+			fmt.Printf("%*s- %s (size=%d)\n", indent+2, "", child.name, child.size)
 		default:
 			panic("huh?")
 		}
