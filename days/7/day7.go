@@ -15,6 +15,9 @@ var sampleInput string
 //go:embed input.txt
 var fullInput string
 
+const totalDiskSpace = 70000000
+const requiredUnusedDiskSpace = 30000000
+
 type ftype int32
 
 const (
@@ -171,6 +174,32 @@ func findSumOfDirsWithSizeLessThan100K(de *direntry) int {
 	return result
 }
 
+func findSmallestDirectoryWithSizeLargerThan(de *direntry, minSize int) *direntry {
+	var result *direntry
+	for i := 0; i < len(de.children); i++ {
+		child := &de.children[i]
+		if child.ftype == file {
+			continue
+		}
+		if child.size < minSize {
+			// Too small, and won't get bigger
+			continue
+		}
+
+		// This directory might work, see whether we can just
+		// delete a part of it.
+		better := findSmallestDirectoryWithSizeLargerThan(child, minSize)
+		if better == nil {
+			// Nope, the whole thing needs to go.
+			better = child
+		}
+		if result == nil || result.size > better.size {
+			result = better
+		}
+	}
+	return result
+}
+
 func Run(useSampleInput bool) error {
 	input := days.PickInput(useSampleInput, sampleInput, fullInput)
 	root, err := loadFS(input)
@@ -184,6 +213,13 @@ func Run(useSampleInput bool) error {
 
 	sum := findSumOfDirsWithSizeLessThan100K(&root)
 	fmt.Printf("sum of sizes of dirs < 100000: %d\n", sum)
+
+	requiredCleanupSize := requiredUnusedDiskSpace - (totalDiskSpace - totalSize)
+	toDelete := findSmallestDirectoryWithSizeLargerThan(&root, requiredCleanupSize)
+	if toDelete == nil {
+		return fmt.Errorf("cannot find directory to delete to free up %d", requiredCleanupSize)
+	}
+	fmt.Printf("delete %q, frees up %d\n", toDelete.name, toDelete.size)
 
 	return nil
 }
