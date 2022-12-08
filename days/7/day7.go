@@ -140,6 +140,37 @@ func printDir(de *direntry, indent int) {
 	}
 }
 
+func calculateDirSizes(de *direntry) int {
+	size := 0
+	for i := 0; i < len(de.children); i++ {
+		child := &de.children[i]
+		if child.ftype == dir {
+			size += calculateDirSizes(child)
+		} else {
+			size += child.size
+		}
+	}
+	de.size = size
+	return size
+}
+
+func findSumOfDirsWithSizeLessThan100K(de *direntry) int {
+	result := 0
+
+	for i := 0; i < len(de.children); i++ {
+		child := &de.children[i]
+		if child.ftype == file {
+			continue
+		}
+
+		if child.size < 100000 {
+			result += child.size
+		}
+		result += findSumOfDirsWithSizeLessThan100K(child)
+	}
+	return result
+}
+
 func Run(useSampleInput bool) error {
 	input := days.PickInput(useSampleInput, sampleInput, fullInput)
 	root, err := loadFS(input)
@@ -147,6 +178,12 @@ func Run(useSampleInput bool) error {
 		return err
 	}
 	printDir(&root, 0)
+
+	totalSize := calculateDirSizes(&root)
+	fmt.Printf("total size %d\n", totalSize)
+
+	sum := findSumOfDirsWithSizeLessThan100K(&root)
+	fmt.Printf("sum of sizes of dirs < 100000: %d\n", sum)
 
 	return nil
 }
