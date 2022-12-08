@@ -33,11 +33,12 @@ var days = []day{
 
 func init() {
 	for index, day := range days {
+		run := day.run
 		cmd := &cobra.Command{
 			Use:   fmt.Sprintf("day%d", index + 1),
 			Short: day.short,
 			Run: func(cmd *cobra.Command, args []string) {
-				err := day.run(useSampleInput)
+				err := run(useSampleInput)
 				if err != nil {
 					fmt.Printf("Error: %v", err)
 					os.Exit(1)
