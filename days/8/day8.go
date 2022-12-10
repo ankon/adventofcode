@@ -27,30 +27,51 @@ var directions = []direction{
 	{-1, 0},
 }
 
-func isVisibleInDirection(trees trees, x, y int, d direction) bool {
+func visibilityInDirection(trees trees, x, y int, d direction) (int, bool) {
 	height := len(trees)
 	width := len(trees[0])
 
+	result := 0
 	t := trees[y][x]
 	x += d.dx
 	y += d.dy
 	for x >= 0 && x < width && y >= 0 && y < height {
+		result++
 		if trees[y][x] >= t {
-			return false
+			return result, false
 		}
 		x += d.dx
 		y += d.dy
 	}
-	return true
+	return result, true
 }
 
-func isVisible(trees trees, x, y int) bool {
+func isVisibleFromOutside(trees trees, x, y int) bool {
 	for _, d := range directions {
-		if isVisibleInDirection(trees, x, y, d) {
+		if _, visibleFromOutside := visibilityInDirection(trees, x, y, d); visibleFromOutside {
 			return true
 		}
 	}
 	return false
+}
+
+func calculateScenicScore(trees trees, x, y int) int {
+	result := 1
+	for _, d := range directions {
+		distance, _ := visibilityInDirection(trees, x, y, d)
+		result *= distance
+	}
+	return result
+}
+
+func printScenicScoreMap(scenicScoreMap [][]int) {
+	for y := 0; y < len(scenicScoreMap); y++ {
+		s := ""
+		for x := 0; x < len(scenicScoreMap[y]); x++ {
+			s += fmt.Sprintf("%4d ", scenicScoreMap[y][x])
+		}
+		fmt.Println(s)
+	}
 }
 
 func Run(useSampleInput bool) error {
@@ -66,12 +87,27 @@ func Run(useSampleInput bool) error {
 	count := 0
 	for y := 0; y < height; y++ {
 		for x := 0; x < width; x++ {
-			if isVisible(trees, x, y) {
+			if isVisibleFromOutside(trees, x, y) {
 				count++
 			}
 		}
 	}
 	fmt.Printf("%d visible trees\n", count)
+
+	scenicScoreMap := make([][]int, height)
+	highestScenicScore := 0
+	for y := 0; y < height; y++ {
+		scenicScoreMap[y] = make([]int, width)
+		for x := 0; x < width; x++ {
+			scenicScore := calculateScenicScore(trees, x, y)
+			scenicScoreMap[y][x] = scenicScore
+			if scenicScore > highestScenicScore {
+				highestScenicScore = scenicScore
+			}
+		}
+	}
+	fmt.Printf("highest scenic score %d\n", highestScenicScore)
+	printScenicScoreMap(scenicScoreMap)
 
 	return nil
 }
