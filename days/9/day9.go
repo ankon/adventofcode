@@ -16,6 +16,8 @@ var sampleInput string
 //go:embed input.txt
 var fullInput string
 
+const debug = false
+
 func Run(useSampleInput bool) error {
 	input := days.PickInput(useSampleInput, sampleInput, fullInput)
 
@@ -145,8 +147,12 @@ func runSteps(steps []string) (headtrail trail, tailtrail trail, err error) {
 				"s": start,
 				"H": newHead,
 			}
-			// fmt.Printf("\nBefore moving tail\n")
-			// tailtrail.show(otherPoints)
+
+			if debug {
+				fmt.Print("\033[H\033[2J")
+				fmt.Printf("\nBefore moving tail\n")
+				tailtrail.show(otherPoints)
+			}
 
 			// Check if the tail needs to move, if so, move it
 			tail := tailtrail.current()
@@ -168,12 +174,11 @@ func runSteps(steps []string) (headtrail trail, tailtrail trail, err error) {
 				tailtrail.add(newTail)
 			}
 
-			if false {
-				fmt.Print("\033[H\033[2J")
+			if debug {
 				tailtrail.show(otherPoints)
 			}
 		}
-		fmt.Printf("\rProcessed %d/%d steps", i, len(steps))
+		fmt.Printf("Processed %d/%d steps\n", i, len(steps))
 	}
 
 	return headtrail, tailtrail, nil
