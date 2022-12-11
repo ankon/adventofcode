@@ -15,6 +15,9 @@ import (
 //go:embed sample.txt
 var sampleInput string
 
+//go:embed sample-2.txt
+var sampleInput2 string
+
 //go:embed input.txt
 var fullInput string
 
@@ -28,12 +31,19 @@ func Run(useSampleInput bool) error {
 	input := days.PickInput(useSampleInput, sampleInput, fullInput)
 
 	steps := strings.Split(strings.TrimSpace(input), "\n")
-	tail, err := runSteps(steps, 1)
+	tail, err := runSteps(steps, 2)
 	if err != nil {
 		return nil
 	}
+	fmt.Printf("Unique points in tail trail (2 knots): %d\n", tail.uniquePoints())
 
-	fmt.Printf("Unique points in tail trail: %d\n", tail.uniquePoints())
+	input = days.PickInput(useSampleInput, sampleInput2, fullInput)
+	steps = strings.Split(strings.TrimSpace(input), "\n")
+	tail, err = runSteps(steps, 10)
+	if err != nil {
+		return nil
+	}
+	fmt.Printf("Unique points in tail trail (10 knots): %d\n", tail.uniquePoints())
 
 	return nil
 }
