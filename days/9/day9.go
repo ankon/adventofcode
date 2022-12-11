@@ -3,6 +3,7 @@ package _9
 import (
 	_ "embed"
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 
@@ -104,19 +105,46 @@ func (t *trail) follow(other *trail) {
 }
 
 func (t *trail) show(otherPoints map[string]point) {
+	bottomLeft := t.bottomLeft
+	topRight := t.topRight
+	for _, p := range otherPoints {
+		if bottomLeft.x > p.x {
+			bottomLeft.x = p.x
+		}
+		if topRight.x < p.x {
+			topRight.x = p.x
+		}
+		if bottomLeft.y > p.y {
+			bottomLeft.y = p.y
+		}
+		if topRight.y < p.y {
+			topRight.y = p.y
+		}
+	}
+
 	c := t.current()
-	for y := t.topRight.y; y >= t.bottomLeft.y; y-- {
+	for y := topRight.y; y >= bottomLeft.y; y-- {
 		line := fmt.Sprintf("%3d ", y)
-	nextX:
-		for x := t.bottomLeft.x; x <= t.topRight.x; x++ {
+		for x := bottomLeft.x; x <= topRight.x; x++ {
 			p := point{x, y}
-			for k, otherPoint := range otherPoints {
+			lowestK := math.MaxInt
+			symbol := ""
+			for s, otherPoint := range otherPoints {
 				if p == otherPoint {
-					line += k
-					continue nextX
+					k, err := strconv.Atoi(s)
+					if err == nil {
+						if k < lowestK {
+							lowestK = k
+							symbol = s
+						}
+					} else if s == "H" || lowestK == math.MaxInt {
+						symbol = s
+					}
 				}
 			}
-			if p == c {
+			if symbol != "" {
+				line += symbol
+			} else if p == c {
 				line += t.symbol
 			} else if slices.Contains(t.points, p) {
 				line += "#"
