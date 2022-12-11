@@ -29,18 +29,50 @@ func Run(useSampleInput bool) error {
 	instructions := strings.Split(strings.TrimSpace(input), "\n")
 
 	sum := 0
-	err := simulateProgram(instructions, state{1}, func(cycle int, state state) {
+	sampleTask1 := func(cycle int, state state) {
 		if debug {
 			fmt.Printf("%d: X=%d\n", cycle, state.x)
 		}
 		if cycle == 20 || cycle == 60 || cycle == 100 || cycle == 140 || cycle == 180 || cycle == 220 {
 			sum += cycle * state.x
 		}
-	})
+	}
+	err := simulateProgram(instructions, state{1}, sampleTask1)
 	if err != nil {
 		return err
 	}
 	fmt.Printf("Signal strength sum %d\n", sum)
+
+	lines := []string{}
+	line := ""
+	pos := 0
+	crt := func(cycle int, state state) {
+		if debug {
+			fmt.Printf("%d: Sprite at %d, drawing pos %d\n", cycle, state.x, pos)
+			fmt.Printf("%d: %s\n", cycle, line)
+		}
+
+		if state.x - 1 <= pos && state.x + 1 >= pos {
+			line += "#"
+		} else {
+			line += "."
+		}
+		pos++
+
+		if cycle % 40 == 0 {
+			lines = append(lines, line)
+			line = ""
+			pos = 0
+		}
+	}
+	err = simulateProgram(instructions, state{1}, crt)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("CRT %d\n", sum)
+	for _, line := range lines {
+		fmt.Println(line)
+	}
 
 	return nil
 }
