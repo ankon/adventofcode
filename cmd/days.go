@@ -18,21 +18,26 @@ import (
 )
 
 type dayRunFunc func(bool) error
+type configureCommandFunc func(*cobra.Command)
+
+var Default configureCommandFunc = func(c *cobra.Command) {}
+
 type day struct {
 	short string
 	run dayRunFunc
+	configureCommand configureCommandFunc
 }
 
 var days = []day{
-	{"Calorie Counting", day1.Run},
-	{"Rock Paper Scissors", day2.Run},
-	{"Rucksack Reorganization", day3.Run},
-	{"Camp Cleanup", day4.Run},
-	{"Supply Stacks", day5.Run},
-	{"Tuning Trouble", day6.Run},
-	{"No Space Left On Device", day7.Run},
-	{"Treetop Tree House", day8.Run},
-	{"Rope Bridge", day9.Run},
+	{"Calorie Counting", day1.Run, Default},
+	{short: "Rock Paper Scissors", run: day2.Run, configureCommand: Default},
+	{"Rucksack Reorganization", day3.Run, Default},
+	{"Camp Cleanup", day4.Run, Default},
+	{"Supply Stacks", day5.Run, Default},
+	{"Tuning Trouble", day6.Run, Default},
+	{"No Space Left On Device", day7.Run, Default},
+	{"Treetop Tree House", day8.Run, Default},
+	{"Rope Bridge", day9.Run, day9.ConfigureCommand},
 }
 
 func init() {
@@ -49,6 +54,7 @@ func init() {
 				}
 			},
 		}
+		day.configureCommand(cmd)
 		rootCmd.AddCommand(cmd)
 	}
 }

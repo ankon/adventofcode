@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/ankon/adventofcode/2022/days"
+	"github.com/spf13/cobra"
 	"golang.org/x/exp/slices"
 )
 
@@ -16,7 +17,11 @@ var sampleInput string
 //go:embed input.txt
 var fullInput string
 
-const debug = false
+var debug = false
+
+func ConfigureCommand(cmd *cobra.Command) {
+	cmd.Flags().BoolVar(&debug, "debug", false, "Enable debug output")
+}
 
 func Run(useSampleInput bool) error {
 	input := days.PickInput(useSampleInput, sampleInput, fullInput)
