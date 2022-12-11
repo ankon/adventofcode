@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/ankon/adventofcode/2022/days"
+	"github.com/ankon/adventofcode/2022/utils"
 	"github.com/spf13/cobra"
 	"golang.org/x/exp/slices"
 )
@@ -43,14 +44,16 @@ func Run(useSampleInput bool) error {
 }
 
 type opFunc func(int) int
-type testFunc func(int) int
 
 type monkey struct {
 	// Items the monkey has (only tracking the worry level)
 	items []int
 
-	op   opFunc
-	test testFunc
+	op opFunc
+
+	divisor         int
+	testTrueMonkey  int
+	testFalseMonkey int
 
 	inspections int
 }
@@ -75,10 +78,14 @@ const testDivisibleByPrefix = "  Test: divisible by "
 const testIfTrueThrowPrefix = "    If true: throw to monkey "
 const testIfFalseThrowPrefix = "    If false: throw to monkey "
 
+var modulo = 1
+
 func parseMonkey(lines []string) (monkey, int, error) {
 	items := []int{}
 	var op opFunc
-	var test testFunc
+	var divisor int
+	var testTrueMonkey int
+	var testFalseMonkey int
 
 	i := 0
 	for ; i < len(lines); i++ {
@@ -96,64 +103,62 @@ func parseMonkey(lines []string) (monkey, int, error) {
 			}
 		} else if strings.HasPrefix(line, opPrefix) {
 			ss := strings.Split(line[len(opPrefix):], " ")
-			arg1, _ := strconv.Atoi(ss[0])
 			arg2, _ := strconv.Atoi(ss[2])
 
-			op = func(level int) int {
-				var result int
-				if ss[0] == "old" {
-					result = level
-				} else {
-					result = arg1
+			switch ss[1] {
+			case "+":
+				if ss[0] != "old" {
+					return monkey{}, i, fmt.Errorf("first operand must be %q for +", "old")
 				}
-				var other int
 				if ss[2] == "old" {
-					other = level
-				} else {
-					other = arg2
+					return monkey{}, i, fmt.Errorf("second operand must not be %q for +", ss[2])
 				}
-
-				switch ss[1] {
-				case "+":
-					result += other
-				case "-":
-					result -= other
-				case "*":
-					result *= other
-				case "/":
-					result /= other
+				op = func(item int) int {
+					return (item + arg2) % modulo
 				}
-
-				return result
+			case "*":
+				if ss[0] != "old" {
+					return monkey{}, i, fmt.Errorf("first operand must be %q for *", "old")
+				}
+				if ss[2] != "old" && !utils.IsPrime(arg2) {
+					return monkey{}, i, fmt.Errorf("second operand must be %q or prime for *", "old")
+				}
+				op = func(item int) int {
+					if ss[2] == "old" {
+						return int(utils.MultiplyMod(uint64(item), uint64(item), uint64(modulo)))
+					} else {
+						return int(utils.MultiplyMod(uint64(item), uint64(arg2), uint64(modulo)))
+					}
+				}
+			default:
+				return monkey{}, i, fmt.Errorf("unsupported operator %q", ss[1])
 			}
 		} else if strings.HasPrefix(line, testDivisibleByPrefix) {
-			divisor, err := strconv.Atoi(line[len(testDivisibleByPrefix):])
+			v, err := strconv.Atoi(line[len(testDivisibleByPrefix):])
 			if err != nil {
 				return monkey{}, i, fmt.Errorf("cannot parse test %q", line)
 			}
+			divisor = v
+
 			ifTrueLine := lines[i+1]
-			trueMonkey, err := strconv.Atoi(ifTrueLine[len(testIfTrueThrowPrefix):])
+			v, err = strconv.Atoi(ifTrueLine[len(testIfTrueThrowPrefix):])
 			if err != nil {
 				return monkey{}, i, fmt.Errorf("cannot parse expected true condition %q", ifTrueLine)
 			}
+			testTrueMonkey = v
+
 			ifFalseLine := lines[i+2]
-			falseMonkey, err := strconv.Atoi(ifFalseLine[len(testIfFalseThrowPrefix):])
+			v, err = strconv.Atoi(ifFalseLine[len(testIfFalseThrowPrefix):])
 			if err != nil {
 				return monkey{}, i, fmt.Errorf("cannot parse expected false condition %q", ifFalseLine)
 			}
-			i += 2
+			testFalseMonkey = v
 
-			test = func(level int) int {
-				if level%divisor == 0 {
-					return trueMonkey
-				} else {
-					return falseMonkey
-				}
-			}
+			i += 2
 		}
 	}
 
-	return monkey{items, op, test, 0}, i, nil
+	return monkey{items, op, divisor, testTrueMonkey, testFalseMonkey, 0}, i, nil
 }
 
 func parseMonkeys(lines []string) ([]*monkey, error) {
@@ -183,6 +188,9 @@ func parseMonkeys(lines []string) ([]*monkey, error) {
 		result = append(result, &m)
 
 		l += consumed
+
+		// XXX: Can we do this nicer?
+		modulo *= m.divisor
 	}
 
 	return result, nil
@@ -213,7 +221,12 @@ func playRound(monkeys []*monkey) {
 				fmt.Printf("    Monkey gets bored with item. Worry level is divided by 3 to %d.\n", level)
 			}
 
-			throwTo := m.test(level)
+			var throwTo int
+			if level%m.divisor == 0 {
+				throwTo = m.testTrueMonkey
+			} else {
+				throwTo = m.testFalseMonkey
+			}
 			if debug {
 				fmt.Printf("    Item with worry level %d is thrown to monkey %d.\n", level, throwTo)
 			}
