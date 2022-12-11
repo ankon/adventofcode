@@ -18,10 +18,14 @@ var sampleInput string
 //go:embed input.txt
 var fullInput string
 
-var debug = false
+var debug = 0
+var rounds = 20
+var relief = true
 
 func ConfigureCommand(cmd *cobra.Command) {
-	cmd.Flags().BoolVar(&debug, "debug", false, "Enable debug output")
+	cmd.Flags().IntVar(&debug, "debug", debug, "Enable debug output (higher numbers mean more output)")
+	cmd.Flags().IntVar(&rounds, "rounds", rounds, "Number of rounds (20 for task 1, 10000 for task 2)")
+	cmd.Flags().BoolVar(&relief, "relief", relief, "Feel relief after inspection (true for task 1, false for task 2)")
 }
 
 func Run(useSampleInput bool) error {
@@ -33,12 +37,12 @@ func Run(useSampleInput bool) error {
 		return err
 	}
 
-	activities := countItemInspections(monkeys, 20)
+	activities := countItemInspections(monkeys, rounds)
 	slices.Sort(activities)
 	mostActivities := activities[len(activities)-1]
 	secondMostActivities := activities[len(activities)-2]
 
-	fmt.Printf("inspections: %d * %d = %d", mostActivities, secondMostActivities, mostActivities*secondMostActivities)
+	fmt.Printf("inspections: %d * %d = %d\n", mostActivities, secondMostActivities, mostActivities*secondMostActivities)
 
 	return nil
 }
@@ -198,7 +202,7 @@ func parseMonkeys(lines []string) ([]*monkey, error) {
 
 func playRound(monkeys []*monkey) {
 	for i, m := range monkeys {
-		if debug {
+		if debug > 2 {
 			fmt.Printf("Monkey %d:\n", i)
 		}
 		for {
@@ -207,18 +211,20 @@ func playRound(monkeys []*monkey) {
 				break
 			}
 
-			if debug {
+			if debug > 2 {
 				fmt.Printf("  Monkey inspects an item with a worry level of %d.\n", item)
 			}
 
 			level := m.op(item)
-			if debug {
+			if debug > 2 {
 				fmt.Printf("    Worry level is now %d.\n", level)
 			}
 
-			level /= 3
-			if debug {
-				fmt.Printf("    Monkey gets bored with item. Worry level is divided by 3 to %d.\n", level)
+			if relief {
+				level /= 3
+				if debug > 2 {
+					fmt.Printf("    Monkey gets bored with item. Worry level is divided by 3 to %d.\n", level)
+				}
 			}
 
 			var throwTo int
@@ -227,7 +233,7 @@ func playRound(monkeys []*monkey) {
 			} else {
 				throwTo = m.testFalseMonkey
 			}
-			if debug {
+			if debug > 2 {
 				fmt.Printf("    Item with worry level %d is thrown to monkey %d.\n", level, throwTo)
 			}
 
@@ -237,20 +243,26 @@ func playRound(monkeys []*monkey) {
 }
 
 func countItemInspections(monkeys []*monkey, rounds int) []int {
-	for round := 0; round < rounds; round++ {
+	for round := 1; round <= rounds; round++ {
 		playRound(monkeys)
 
-		if debug {
-			fmt.Printf("After round %d, the monkeys are holding items with these worry levels:\n", round+1)
+		if debug > 1 {
+			fmt.Printf("After round %d, the monkeys are holding items with these worry levels:\n", round)
 			for k, m := range monkeys {
 				fmt.Printf("Monkey %d: %v\n", k, m.items)
+			}
+		}
+		if debug > 0 && (round == 1 || round == 20 || round%1000 == 0) {
+			fmt.Printf("== After round %d ==\n", round)
+			for k, m := range monkeys {
+				fmt.Printf("Monkey %d inspected items %d times.\n", k, m.inspections)
 			}
 		}
 	}
 
 	result := make([]int, len(monkeys))
-	for i, m := range monkeys {
-		result[i] = m.inspections
+	for k, m := range monkeys {
+		result[k] = m.inspections
 	}
 	return result
 }
