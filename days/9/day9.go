@@ -80,6 +80,29 @@ func (t *trail) add(p point) {
 	}
 }
 
+func (t *trail) follow(other trail) {
+	// Check if the tail needs to move, if so, move it
+	head := other.current()
+	tail := t.current()
+	touches := head.x >= tail.x-1 && head.x <= tail.x+1 && head.y >= tail.y-1 && head.y <= tail.y+1
+	if !touches {
+		dy := head.y - tail.y
+		if dy < 0 {
+			dy = -1
+		} else if dy > 0 {
+			dy = +1
+		}
+		dx := head.x - tail.x
+		if dx < 0 {
+			dx = -1
+		} else if dx > 0 {
+			dx = +1
+		}
+		newTail := point{tail.x + dx, tail.y + dy}
+		t.add(newTail)
+	}
+}
+
 func (t *trail) show(otherPoints map[string]point) {
 	c := t.current()
 	for y := t.topRight.y; y >= t.bottomLeft.y; y-- {
@@ -159,25 +182,7 @@ func runSteps(steps []string) (headtrail trail, tailtrail trail, err error) {
 				tailtrail.show(otherPoints)
 			}
 
-			// Check if the tail needs to move, if so, move it
-			tail := tailtrail.current()
-			touches := newHead.x >= tail.x-1 && newHead.x <= tail.x+1 && newHead.y >= tail.y-1 && newHead.y <= tail.y+1
-			if !touches {
-				dy := newHead.y - tail.y
-				if dy < 0 {
-					dy = -1
-				} else if dy > 0 {
-					dy = +1
-				}
-				dx := newHead.x - tail.x
-				if dx < 0 {
-					dx = -1
-				} else if dx > 0 {
-					dx = +1
-				}
-				newTail := point{tail.x + dx, tail.y + dy}
-				tailtrail.add(newTail)
-			}
+			tailtrail.follow(headtrail)
 
 			if debug {
 				tailtrail.show(otherPoints)
