@@ -174,14 +174,20 @@ var directions = map[string]point{
 }
 
 func runSteps(steps []string, knots int) (tail trail, err error) {
+	if knots < 2 {
+		return trail{}, fmt.Errorf("need at least 2 knots")
+	}
 	start := point{0, 0}
 	trails := make(map[int]*trail)
 	trails[0] = makeTrail("H")
-	i := 1
-	for ; i < knots; i++ {
-		trails[i] = makeTrail(strconv.Itoa(i))
+	if knots == 2 {
+		trails[1] = makeTrail("T")
+	} else {
+		i := 1
+		for ; i < knots; i++ {
+			trails[i] = makeTrail(strconv.Itoa(i))
+		}
 	}
-	trails[i] = makeTrail("T")
 	for i, step := range steps {
 		d, c, found := strings.Cut(step, " ")
 		if !found {
@@ -204,30 +210,24 @@ func runSteps(steps []string, knots int) (tail trail, err error) {
 				head.y + stepDelta.y,
 			}
 			trails[0].add(newHead)
-
-			otherPoints := map[string]point{
-				"s": start,
-			}
-			for t := 0; t < knots; t++ {
-				otherPoints[trails[t].symbol] = trails[t].current()
-			}
-
-			if debug {
-				fmt.Print("\033[H\033[2J")
-				fmt.Printf("\nBefore moving tails\n")
-				trails[knots].show(otherPoints)
-			}
-
-			for t := 1; t <= knots; t++ {
+			for t := 1; t < knots; t++ {
 				trails[t].follow(trails[t-1])
 			}
 
 			if debug {
-				trails[knots].show(otherPoints)
+				otherPoints := map[string]point{
+					"s": start,
+				}
+				for t := 0; t < knots; t++ {
+					otherPoints[trails[t].symbol] = trails[t].current()
+				}
+
+				fmt.Print("\033[H\033[2J")
+				trails[knots-1].show(otherPoints)
 			}
 		}
 		fmt.Printf("Processed %d/%d steps\n", i, len(steps))
 	}
 
-	return *trails[knots], nil
+	return *trails[knots-1], nil
 }
