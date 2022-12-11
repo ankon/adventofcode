@@ -22,6 +22,9 @@ var debug = 0
 var rounds = 20
 var relief = true
 
+// The modulo to use for arithmetics, calculated from the divisors of the monkey test functions
+var modulo = 1
+
 func ConfigureCommand(cmd *cobra.Command) {
 	cmd.Flags().IntVar(&debug, "debug", debug, "Enable debug output (higher numbers mean more output)")
 	cmd.Flags().IntVar(&rounds, "rounds", rounds, "Number of rounds (20 for task 1, 10000 for task 2)")
@@ -81,8 +84,6 @@ const opPrefix = "  Operation: new = "
 const testDivisibleByPrefix = "  Test: divisible by "
 const testIfTrueThrowPrefix = "    If true: throw to monkey "
 const testIfFalseThrowPrefix = "    If false: throw to monkey "
-
-var modulo = 1
 
 func parseMonkey(lines []string) (monkey, int, error) {
 	items := []int{}
