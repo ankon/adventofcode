@@ -10,7 +10,7 @@
             "mode": "debug",
             "request": "launch",
             "args": [
-                "day8",
+                "day9",
                 "--sample=true"
             ],
             "program": "${workspaceFolder}"
@@ -21,7 +21,7 @@
             "mode": "debug",
             "request": "launch",
             "args": [
-                "day8",
+                "day9",
                 "--sample=false"
             ],
             "program": "${workspaceFolder}"
