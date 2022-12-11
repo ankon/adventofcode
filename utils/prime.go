@@ -35,3 +35,50 @@ func IsPrime(p int) bool {
 	}
 	return true
 }
+
+// (Unique) prime factors
+type UniquePrimeFactors []int
+
+func (p *UniquePrimeFactors) Value() int {
+	result := 1
+	for _, f := range *p {
+		result *= f
+	}
+	return result
+}
+
+func (p *UniquePrimeFactors) Insert(f int) bool {
+	if !IsPrime(f) {
+		panic("cannot insert non-prime")
+	}
+	i := sort.SearchInts(*p, f)
+	if i < len(*p) && (*p)[i] == f {
+		return false
+	}
+	if i == len(*p) {
+		newP := append(*p, f)
+		p = &newP
+	} else {
+		newP := make(UniquePrimeFactors, 0, len(*p) + 1)
+		newP = append(newP, (*p)[0:i]...)
+		newP = append(newP, f)
+		newP = append(newP, (*p)[i:]...)
+		p = &newP	
+	}
+	return true
+}
+
+// Factorize returns the unique prime factors of the given number
+func Factorize(n int) UniquePrimeFactors {
+	result := UniquePrimeFactors{}
+	for p := 2; n > 1; p = nextPrimeAfter(p) {
+		f := 0
+		for ; n%p == 0; n /= p {
+			f++
+		}
+		if f > 0 {
+			result = append(result, p)
+		}
+	}
+	return result
+}

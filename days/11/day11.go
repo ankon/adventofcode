@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/ankon/adventofcode/2022/days"
+	"github.com/ankon/adventofcode/2022/utils"
 	"github.com/spf13/cobra"
 	"golang.org/x/exp/slices"
 )
@@ -17,10 +18,10 @@ var sampleInput string
 //go:embed input.txt
 var fullInput string
 
-var debug = false
+var debug = 0
 
 func ConfigureCommand(cmd *cobra.Command) {
-	cmd.Flags().BoolVar(&debug, "debug", false, "Enable debug output")
+	cmd.Flags().IntVar(&debug, "debug", 0, "Enable debug output")
 }
 
 func Run(useSampleInput bool) error {
@@ -42,12 +43,12 @@ func Run(useSampleInput bool) error {
 	return nil
 }
 
-type opFunc func(int) int
-type testFunc func(int) int
+type opFunc func(utils.UniquePrimeFactors) utils.UniquePrimeFactors
+type testFunc func(utils.UniquePrimeFactors) int
 
 type monkey struct {
 	// Items the monkey has (only tracking the worry level)
-	items []int
+	items []utils.UniquePrimeFactors
 
 	op   opFunc
 	test testFunc
@@ -55,9 +56,9 @@ type monkey struct {
 	inspections int
 }
 
-func (m *monkey) inspectItem() (int, bool) {
+func (m *monkey) inspectItem() (utils.UniquePrimeFactors, bool) {
 	if len(m.items) == 0 {
-		return 0, false
+		return utils.UniquePrimeFactors{}, false
 	}
 	result := m.items[0]
 	m.items = m.items[1:]
@@ -65,8 +66,8 @@ func (m *monkey) inspectItem() (int, bool) {
 	return result, true
 }
 
-func (m *monkey) catchItem(level int) {
-	m.items = append(m.items, level)
+func (m *monkey) catchItem(item utils.UniquePrimeFactors) {
+	m.items = append(m.items, item)
 }
 
 const startItemsPrefix = "  Starting items: "
@@ -76,7 +77,7 @@ const testIfTrueThrowPrefix = "    If true: throw to monkey "
 const testIfFalseThrowPrefix = "    If false: throw to monkey "
 
 func parseMonkey(lines []string) (monkey, int, error) {
-	items := []int{}
+	items := []utils.UniquePrimeFactors{}
 	var op opFunc
 	var test testFunc
 
@@ -92,44 +93,50 @@ func parseMonkey(lines []string) (monkey, int, error) {
 				if err != nil {
 					return monkey{}, i, fmt.Errorf("cannot parse starting items %q", ss)
 				}
-				items = append(items, v)
+				items = append(items, utils.Factorize(v))
 			}
 		} else if strings.HasPrefix(line, opPrefix) {
 			ss := strings.Split(line[len(opPrefix):], " ")
-			arg1, _ := strconv.Atoi(ss[0])
 			arg2, _ := strconv.Atoi(ss[2])
 
-			op = func(level int) int {
-				var result int
-				if ss[0] == "old" {
-					result = level
-				} else {
-					result = arg1
+			switch ss[1] {
+			case "+": 
+				if ss[0] != "old" {
+					return monkey{}, i, fmt.Errorf("first operand must be %q for +", "old")
 				}
-				var other int
 				if ss[2] == "old" {
-					other = level
-				} else {
-					other = arg2
+					return monkey{}, i, fmt.Errorf("second operand must not be %q for +", ss[2])
 				}
-
-				switch ss[1] {
-				case "+":
-					result += other
-				case "-":
-					result -= other
-				case "*":
-					result *= other
-				case "/":
-					result /= other
+				op = func(pf utils.UniquePrimeFactors) utils.UniquePrimeFactors {
+					return utils.Factorize(pf.Value() + arg2)
 				}
-
-				return result
+			case "*":
+				if ss[0] != "old" {
+					return monkey{}, i, fmt.Errorf("first operand must be %q for *", "old")
+				}
+				if ss[2] != "old" && !utils.IsPrime(arg2) {
+					return monkey{}, i, fmt.Errorf("second operand must be %q or prime for *", "old")
+				} 
+				op = func(pf utils.UniquePrimeFactors) utils.UniquePrimeFactors {
+					if ss[2] == "old" {
+						for _, f := range pf {
+							pf.Insert(f)
+						}
+					} else {
+						pf.Insert(arg2)
+					}
+					return pf
+				}
+			default:
+				return monkey{}, i, fmt.Errorf("unsupported operator %q", ss[1])
 			}
 		} else if strings.HasPrefix(line, testDivisibleByPrefix) {
 			divisor, err := strconv.Atoi(line[len(testDivisibleByPrefix):])
 			if err != nil {
 				return monkey{}, i, fmt.Errorf("cannot parse test %q", line)
+			}
+			if !utils.IsPrime(divisor) {
+				return monkey{}, i, fmt.Errorf("divisor %d in test must be prime", divisor)
 			}
 			ifTrueLine := lines[i+1]
 			trueMonkey, err := strconv.Atoi(ifTrueLine[len(testIfTrueThrowPrefix):])
@@ -143,12 +150,13 @@ func parseMonkey(lines []string) (monkey, int, error) {
 			}
 			i += 2
 
-			test = func(level int) int {
-				if level%divisor == 0 {
-					return trueMonkey
-				} else {
-					return falseMonkey
+			test = func(item utils.UniquePrimeFactors) int {
+				for _, p := range item {
+					if p == divisor {
+						return trueMonkey
+					}
 				}
+				return falseMonkey
 			}
 		}
 	}
@@ -190,7 +198,7 @@ func parseMonkeys(lines []string) ([]*monkey, error) {
 
 func playRound(monkeys []*monkey) {
 	for i, m := range monkeys {
-		if debug {
+		if debug > 1 {
 			fmt.Printf("Monkey %d:\n", i)
 		}
 		for {
@@ -199,26 +207,26 @@ func playRound(monkeys []*monkey) {
 				break
 			}
 
-			if debug {
-				fmt.Printf("  Monkey inspects an item with a worry level of %d.\n", item)
+			if debug > 1 {
+				fmt.Printf("  Monkey inspects an item with a worry level of %v.\n", item)
 			}
 
-			level := m.op(item)
-			if debug {
-				fmt.Printf("    Worry level is now %d.\n", level)
+			newItem := m.op(item)
+			if debug > 1 {
+				fmt.Printf("    Worry level is now %v.\n", newItem)
 			}
 
-			level /= 3
-			if debug {
-				fmt.Printf("    Monkey gets bored with item. Worry level is divided by 3 to %d.\n", level)
+			// level /= 3
+			// if debug > 1 {
+			// 	fmt.Printf("    Monkey gets bored with item. Worry level is divided by 3 to %d.\n", level)
+			// }
+
+			throwTo := m.test(newItem)
+			if debug > 1 {
+				fmt.Printf("    Item with worry level %v is thrown to monkey %d.\n", newItem, throwTo)
 			}
 
-			throwTo := m.test(level)
-			if debug {
-				fmt.Printf("    Item with worry level %d is thrown to monkey %d.\n", level, throwTo)
-			}
-
-			monkeys[throwTo].catchItem(level)
+			monkeys[throwTo].catchItem(newItem)
 		}
 	}
 }
@@ -227,7 +235,7 @@ func countItemInspections(monkeys []*monkey, rounds int) []int {
 	for round := 0; round < rounds; round++ {
 		playRound(monkeys)
 
-		if debug {
+		if debug > 0 {
 			fmt.Printf("After round %d, the monkeys are holding items with these worry levels:\n", round+1)
 			for k, m := range monkeys {
 				fmt.Printf("Monkey %d: %v\n", k, m.items)

@@ -12,7 +12,7 @@
             "args": [
                 "day11",
                 "--sample=true",
-                "--debug"
+                "--debug=2"
             ],
             "program": "${workspaceFolder}"
         },
