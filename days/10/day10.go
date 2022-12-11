@@ -10,7 +10,10 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var trivialInput = "noop\naddx 3\naddx -5\n"
+var trivialInput = `
+	noop
+	addx 3
+	addx -5`
 
 //go:embed sample.txt
 var sampleInput string
