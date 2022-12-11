@@ -5,6 +5,7 @@ import (
 	"os"
 
 	day1 "github.com/ankon/adventofcode/2022/days/1"
+	day10 "github.com/ankon/adventofcode/2022/days/10"
 	day2 "github.com/ankon/adventofcode/2022/days/2"
 	day3 "github.com/ankon/adventofcode/2022/days/3"
 	day4 "github.com/ankon/adventofcode/2022/days/4"
@@ -38,6 +39,7 @@ var days = []day{
 	{"No Space Left On Device", day7.Run, Default},
 	{"Treetop Tree House", day8.Run, Default},
 	{"Rope Bridge", day9.Run, day9.ConfigureCommand},
+	{"Cathode-Ray Tube", day10.Run, day10.ConfigureCommand},
 }
 
 func init() {
