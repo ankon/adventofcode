@@ -27,12 +27,12 @@ func Run(useSampleInput bool) error {
 	input := days.PickInput(useSampleInput, sampleInput, fullInput)
 
 	steps := strings.Split(strings.TrimSpace(input), "\n")
-	_, trail, err := runSteps(steps)
+	tail, err := runSteps(steps, 1)
 	if err != nil {
 		return nil
 	}
 
-	fmt.Printf("Unique points in tail trail: %d\n", trail.uniquePoints())
+	fmt.Printf("Unique points in tail trail: %d\n", tail.uniquePoints())
 
 	return nil
 }
@@ -80,7 +80,7 @@ func (t *trail) add(p point) {
 	}
 }
 
-func (t *trail) follow(other trail) {
+func (t *trail) follow(other *trail) {
 	// Check if the tail needs to move, if so, move it
 	head := other.current()
 	tail := t.current()
@@ -129,8 +129,8 @@ func (t *trail) show(otherPoints map[string]point) {
 	}
 }
 
-func makeTrail(symbol string) trail {
-	return trail{
+func makeTrail(symbol string) *trail {
+	return &trail{
 		symbol:     symbol,
 		points:     []point{{0, 0}},
 		bottomLeft: point{0, 0},
@@ -145,51 +145,61 @@ var directions = map[string]point{
 	"D": {0, -1},
 }
 
-func runSteps(steps []string) (headtrail trail, tailtrail trail, err error) {
+func runSteps(steps []string, knots int) (tail trail, err error) {
 	start := point{0, 0}
-	headtrail = makeTrail("H")
-	tailtrail = makeTrail("T")
+	trails := make(map[int]*trail)
+	trails[0] = makeTrail("H")
+	i := 1
+	for ; i < knots; i++ {
+		trails[i] = makeTrail(strconv.Itoa(i))
+	}
+	trails[i] = makeTrail("T")
 	for i, step := range steps {
 		d, c, found := strings.Cut(step, " ")
 		if !found {
-			return headtrail, tailtrail, fmt.Errorf("invalid step")
+			return trail{}, fmt.Errorf("invalid step")
 		}
 		stepDelta, found := directions[d]
 		if !found {
-			return headtrail, tailtrail, fmt.Errorf("invalid direction %q", d)
+			return trail{}, fmt.Errorf("invalid direction %q", d)
 		}
 		count, err := strconv.Atoi(c)
 		if err != nil {
-			return headtrail, tailtrail, fmt.Errorf("invalid count %q", c)
+			return trail{}, fmt.Errorf("invalid count %q", c)
 		}
 
 		for i := 0; i < count; i++ {
 			// Move the head
+			head := trails[0].current()
 			newHead := point{
-				headtrail.current().x + stepDelta.x,
-				headtrail.current().y + stepDelta.y,
+				head.x + stepDelta.x,
+				head.y + stepDelta.y,
 			}
-			headtrail.add(newHead)
+			trails[0].add(newHead)
 
 			otherPoints := map[string]point{
 				"s": start,
-				"H": newHead,
+			}
+			for t := 0; t < knots; t++ {
+				otherPoints[trails[t].symbol] = trails[t].current()
 			}
 
 			if debug {
 				fmt.Print("\033[H\033[2J")
-				fmt.Printf("\nBefore moving tail\n")
-				tailtrail.show(otherPoints)
+				fmt.Printf("\nBefore moving tails\n")
+				trails[knots].show(otherPoints)
 			}
 
-			tailtrail.follow(headtrail)
+			for t := 1; t <= knots; t++ {
+				trails[t].follow(trails[t-1])
+			}
 
 			if debug {
-				tailtrail.show(otherPoints)
+				trails[knots].show(otherPoints)
 			}
 		}
 		fmt.Printf("Processed %d/%d steps\n", i, len(steps))
 	}
 
-	return headtrail, tailtrail, nil
+	return *trails[knots], nil
 }
