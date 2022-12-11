@@ -55,14 +55,14 @@ func Run(useSampleInput bool) error {
 			fmt.Printf("%d: %s\n", cycle, line)
 		}
 
-		if state.x - 1 <= pos && state.x + 1 >= pos {
+		if state.x-1 <= pos && state.x+1 >= pos {
 			line += "#"
 		} else {
 			line += "."
 		}
 		pos++
 
-		if cycle % 40 == 0 {
+		if cycle%40 == 0 {
 			lines = append(lines, line)
 			line = ""
 			pos = 0
