@@ -4,6 +4,10 @@ type Stack[T any] struct {
 	data []T
 }
 
+func (s *Stack[T]) Len() int {
+	return len(s.data)
+}
+
 func (s *Stack[T]) Top() T {
 	return s.data[len(s.data)-1]
 }
