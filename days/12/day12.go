@@ -3,6 +3,7 @@ package _12
 import (
 	_ "embed"
 	"fmt"
+	"math"
 	"sort"
 	"strings"
 
@@ -32,6 +33,20 @@ func Run(useSampleInput bool) error {
 
 	p := m.findPath(start, end)
 	fmt.Printf("Shortest path: %d steps\n", len(p)-1)
+
+	// Find all possible starting points (elevation = 'a')
+	shortestPathLen := math.MaxInt
+	for y := 0; y < m.height(); y++ {
+		for x := 0; x < m.width(); x++ {
+			if m[y][x] == byte('a') {
+				p := m.findPath(point{x, y}, end)
+				if p != nil && len(p) < shortestPathLen {
+					shortestPathLen = len(p) - 1
+				}
+			}
+		}
+	}
+	fmt.Printf("Shortest possible path: %d steps\n", shortestPathLen)
 
 	return nil
 }
