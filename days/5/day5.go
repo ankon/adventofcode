@@ -7,33 +7,10 @@ import (
 	"strings"
 
 	"github.com/ankon/adventofcode/2022/days"
+	"github.com/ankon/adventofcode/2022/utils"
 )
 
-type stack struct {
-	// Crates are named by single (upper-case) letters.
-	crates []byte
-}
-
-func (s *stack) Top() byte {
-	return s.crates[len(s.crates)-1]
-}
-
-func (s *stack) Pop() byte {
-	end := len(s.crates)-1
-	result := s.crates[end]
-	s.crates = s.crates[:end]
-	return result
-}
-
-func (s *stack) Push(x byte) {
-	s.crates = append(s.crates, x)
-}
-
-func (s *stack) Clone() stack {
-	result := stack{}
-	result.crates = append(result.crates, s.crates...)
-	return result
-}
+type crateStack = utils.Stack[byte]
 
 type action struct {
 	from int
@@ -53,7 +30,7 @@ var sampleInput string
 //go:embed input.txt
 var fullInput string
 
-func simulateActionsCrateMover9000(stacks []stack, actions []action) error {
+func simulateActionsCrateMover9000(stacks []crateStack, actions []action) error {
 	for _, action := range actions {
 		for i := 0; i < action.count; i++ {
 			x := stacks[action.from - 1].Pop()
@@ -63,13 +40,13 @@ func simulateActionsCrateMover9000(stacks []stack, actions []action) error {
 	return nil
 }
 
-func simulateActionsCrateMover9001(stacks []stack, actions []action) error {
+func simulateActionsCrateMover9001(stacks []crateStack, actions []action) error {
 	for _, action := range actions {
 		if action.count == 1 {
 			x := stacks[action.from - 1].Pop()
 			stacks[action.to - 1].Push(x)
 		} else {
-			helper := stack{}
+			helper := crateStack{}
 			for i := 0; i < action.count; i++ {
 				x := stacks[action.from - 1].Pop()
 				helper.Push(x)
@@ -96,9 +73,9 @@ func parseAction(l string) (action, error) {
 	return action{from,to,count}, nil
 }
 
-func parseStacks(stackLines []string) ([]stack, error) {
+func parseStacks(stackLines []string) ([]crateStack, error) {
 	stackNames := stackLines[len(stackLines) - 1]
-	stacks := make([]stack, int(math.Ceil(float64(len(stackNames)) / 4)))
+	stacks := make([]crateStack, int(math.Ceil(float64(len(stackNames)) / 4)))
 	for i := len(stackLines) - 2; i >= 0; i-- {
 		stackLine := stackLines[i]
 		for s := 0; s < (len(stackLine) + 1) / 4; s++ {
@@ -116,7 +93,7 @@ func parseStacks(stackLines []string) ([]stack, error) {
 	return stacks, nil
 }
 
-func parseInput(input string) (stacks []stack, actions []action, err error) {
+func parseInput(input string) (stacks []crateStack, actions []action, err error) {
 	s := parsing_stacks
 	stackLines := []string{}
 
@@ -152,7 +129,7 @@ func parseInput(input string) (stacks []stack, actions []action, err error) {
 	return stacks, actions, nil
 }
 
-func getTopCrates(stacks []stack) string {
+func getTopCrates(stacks []crateStack) string {
 	result := ""
 	for _, stack := range stacks {
 		result += string(stack.Top())
@@ -167,7 +144,7 @@ func Run(useSampleInput bool) error {
 		return fmt.Errorf("cannot parse input: %w", err)
 	}
 
-	stacks := make([]stack, len(inputStacks))
+	stacks := make([]crateStack, len(inputStacks))
 	for i, stack := range inputStacks {
 		stacks[i] = stack.Clone()
 	}
