@@ -75,9 +75,37 @@ fn sum_of_possible_games(input: &str) -> u32 {
     result
 }
 
+fn sum_of_minimal_powers(input: &str) -> u32 {
+    let mut result = 0;
+    for line in input.lines() {
+        match line.parse::<Game>() {
+            Ok(game) => {
+                let mut max_red = 0;
+                let mut max_green = 0;
+                let mut max_blue = 0;
+
+                for draw in game.draws {
+                    if draw.red > 0 {
+                        max_red = std::cmp::max(max_red, draw.red);
+                    }
+                    if draw.green > 0 {
+                        max_green = std::cmp::max(max_green, draw.green);
+                    }
+                    if draw.blue > 0 {
+                        max_blue = std::cmp::max(max_blue, draw.blue)
+                    }
+                }
+                result += max_red * max_green * max_blue;
+            },
+            Err(reason) => println!("error = {}", reason)
+        }
+    }
+    result
+}
+
 pub fn main() {
     match std::fs::read_to_string("day2.input") {
-        Ok(input) => println!("value = {}", sum_of_possible_games(&input)),
+        Ok(input) => println!("part1 = {}, part2 = {}", sum_of_possible_games(&input), sum_of_minimal_powers(&input)),
         Err(reason) => println!("error = {}", reason)
     }
 }
@@ -95,5 +123,16 @@ Game 4: 1 green, 3 red, 6 blue; 3 green, 6 red; 3 green, 15 blue, 14 red
 Game 5: 6 red, 1 blue, 3 green; 2 blue, 1 red, 2 green";
 
         assert_eq!(sum_of_possible_games(DATA), 8);
+    }
+
+    #[test]
+    fn sum_of_minimal_powers_example2() {
+        static DATA: &str = "Game 1: 3 blue, 4 red; 1 red, 2 green, 6 blue; 2 green
+Game 2: 1 blue, 2 green; 3 green, 4 blue, 1 red; 1 green, 1 blue
+Game 3: 8 green, 6 blue, 20 red; 5 blue, 4 red, 13 green; 5 green, 1 red
+Game 4: 1 green, 3 red, 6 blue; 3 green, 6 red; 3 green, 15 blue, 14 red
+Game 5: 6 red, 1 blue, 3 green; 2 blue, 1 red, 2 green";
+
+        assert_eq!(sum_of_minimal_powers(DATA), 2286);
     }
 }
