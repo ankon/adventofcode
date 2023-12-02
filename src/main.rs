@@ -5,30 +5,27 @@ treb7uchet";
 
 #[derive(Debug)]
 struct Line {
-    first: Option<i32>,
-    last: Option<i32>,
+    digits: Vec<i32>,
 }
 
 impl Line {
     fn new() -> Line {
         Line {
-            first: None,
-            last: None,
+            digits: [].to_vec(),
         }
     }
 
-    fn visit_digit(&mut self, digit: i32) {
-        if self.first.is_none() {
-            self.first = Some(digit);
-        } else {
-            self.last = Some(digit);
+    pub fn visit_digit(&mut self, digit: i32) {
+        if self.digits.len() == 2 {
+            self.digits.pop();
         }
+        self.digits.push(digit);
     }
 
-    fn value(&self) -> i32 {
-        let first = self.first.unwrap();
-        if let Some(last) = self.last {
-            10 * last + first
+    pub fn value(&self) -> i32 {
+        let first = self.digits.first().unwrap();
+        if let Some(last) = self.digits.get(1) {
+            10 * first + last
         } else {
             10 * first + first
         }
@@ -40,7 +37,7 @@ impl std::str::FromStr for Line {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let mut line = Line::new();
-        for c in s.chars().rev() {
+        for c in s.chars() {
             if let '0'..='9' = c {
                 let digit = c.to_digit(10).unwrap();
                 line.visit_digit(digit as i32);
@@ -65,5 +62,26 @@ fn main() {
     match std::fs::read_to_string("day1.input") {
         Ok(input) => println!("real value = {}", calculate_calibration_value(&input)),
         Err(reason) => println!("error = {}", reason)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    // Note this useful idiom: importing names from outer (for mod tests) scope.
+    use super::*;
+
+    #[test]
+    fn test_line_single_digit() {
+        let mut line = Line::new();
+        line.visit_digit(5);
+        assert_eq!(line.value(), 55);
+    }
+
+    #[test]
+    fn test_line_multiple_digit() {
+        let mut line = Line::new();
+        line.visit_digit(5);
+        line.visit_digit(3);
+        assert_eq!(line.value(), 53);
     }
 }
