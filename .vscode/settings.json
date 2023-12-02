@@ -1,7 +1,4 @@
 {
     "editor.formatOnSave": true,
     "editor.formatOnSaveMode": "modificationsIfAvailable",
-    "[go]": {
-        "editor.defaultFormatter": "golang.go"
-    },
 }

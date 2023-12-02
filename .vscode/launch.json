@@ -4,28 +4,5 @@
     // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
-        {
-            "name": "Sample",
-            "type": "go",
-            "mode": "debug",
-            "request": "launch",
-            "args": [
-                "day12",
-                "--sample=true",
-                "--debug=1"
-            ],
-            "program": "${workspaceFolder}"
-        },
-        {
-            "name": "Full",
-            "type": "go",
-            "mode": "debug",
-            "request": "launch",
-            "args": [
-                "day12",
-                "--sample=false"
-            ],
-            "program": "${workspaceFolder}"
-        }
     ]
 }
