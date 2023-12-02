@@ -62,4 +62,8 @@ fn calculate_calibration_value(input: &str) -> i32 {
 
 fn main() {
     println!("test value = {}", calculate_calibration_value(TEST_STR));
+    match std::fs::read_to_string("day1.input") {
+        Ok(input) => println!("real value = {}", calculate_calibration_value(&input)),
+        Err(reason) => println!("error = {}", reason)
+    }
 }
