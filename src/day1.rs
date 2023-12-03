@@ -117,9 +117,9 @@ mod tests {
     #[test]
     fn calculate_calibration_value_example1() {
         static DATA: &str = "1abc2
-        pqr3stu8vwx
-        a1b2c3d4e5f
-        treb7uchet";
+pqr3stu8vwx
+a1b2c3d4e5f
+treb7uchet";
         let value = calculate_calibration_value(DATA);
         assert_eq!(142, value);
     }
@@ -127,12 +127,12 @@ mod tests {
     #[test]
     fn calculate_calibration_value_example2() {
         static DATA: &str = "two1nine
-        eightwothree
-        abcone2threexyz
-        xtwone3four
-        4nineeightseven2
-        zoneight234
-        7pqrstsixteen";
+eightwothree
+abcone2threexyz
+xtwone3four
+4nineeightseven2
+zoneight234
+7pqrstsixteen";
         let value = calculate_calibration_value(DATA);
         assert_eq!(281, value);
     }
