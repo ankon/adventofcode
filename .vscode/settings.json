@@ -2,4 +2,5 @@
     "editor.formatOnSave": true,
     "editor.formatOnSaveMode": "modificationsIfAvailable",
     "rust-analyzer.check.command": "clippy",
+    "cmake.configureOnOpen": false,
 }
