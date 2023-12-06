@@ -1,13 +1,13 @@
 {
     "configurations": [
         {
-            "type": "cppdbg",
+            "type": "lldb",
             "request": "launch",
             "name": "run adventofcode",
             "program": "${workspaceFolder}/target/debug/adventofcode",
             "args": [],
             "cwd": "${workspaceFolder}",
-            "sourceFileMap": {},
+            "sourceLanguages": ["rust"],
         }
     ]
 }
