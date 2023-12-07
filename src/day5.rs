@@ -135,14 +135,27 @@ impl Almanac {
         None
     }
 
-    fn lowest_location(&self) -> usize {
+    fn lowest_location(&self, use_ranges: bool) -> usize {
         // First we need to find a "path" from a "seed-to-" map
         // to a "-to-location" map. We can then apply the same path
         // for each of the seeds, and output the minimum location value.
         let mut result = std::usize::MAX;
-        if let Some(map) =self.mapping("seed", "location") {
-            for i in &self.seeds {
-                result = min(result, map(*i));
+        if let Some(map) = self.mapping("seed", "location") {
+            if use_ranges {
+                let mut i = 0;
+                while i < self.seeds.len() {
+                    let start = self.seeds[i];
+                    let length = self.seeds[i+1];
+                    i += 2;
+
+                    for j in start..start+length {
+                        result = min(result, map(j));
+                    }
+                }
+            } else {
+                for i in &self.seeds {
+                    result = min(result, map(*i));
+                }
             }
             return result
         }
@@ -155,7 +168,8 @@ pub fn main() {
     match std::fs::read_to_string("day5.input") {
         Ok(input) => {
             if let Ok(almanac) = input.parse::<Almanac>() {
-                println!("lowest_location = {}", almanac.lowest_location());
+                println!("lowest_location (part 1) = {}", almanac.lowest_location(false));
+                println!("lowest_location (part 2) = {}", almanac.lowest_location(true));
             }
         },
         Err(reason) => println!("error = {}", reason)
@@ -166,9 +180,7 @@ pub fn main() {
 mod tests {
     use super::*;
 
-    #[test]
-    fn test() {
-        static DATA: &str = "seeds: 79 14 55 13
+    static DATA: &str = "seeds: 79 14 55 13
 
 seed-to-soil map:
 50 98 2
@@ -201,7 +213,16 @@ temperature-to-humidity map:
 humidity-to-location map:
 60 56 37
 56 93 4";
+
+    #[test]
+    fn part1_example() {
         let almanac = DATA.parse::<Almanac>().unwrap();
-        assert_eq!(almanac.lowest_location(), 35);
+        assert_eq!(almanac.lowest_location(false), 35);
+    }
+
+    #[test]
+    fn part2_example() {
+        let almanac = DATA.parse::<Almanac>().unwrap();
+        assert_eq!(almanac.lowest_location(true), 46);
     }
 }
