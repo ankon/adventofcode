@@ -34,10 +34,10 @@ impl RaceTable {
         // The tricky part here is that if the zero is not an integer, we have to round it up (x1) or down (x2),
         // and if it is an integer we need to exclude it from the result and use the next higher/lower value.
         // We can do that by adding 1 and then rounding down (x1) or subtracting 1 and then rounding up (x2).
-        let m = ((time * time / 4 - distance) as f32).sqrt();
-        let x1 = ((time as f32) / 2.0 - m + 1_f32).floor().clamp(0_f32, time as f32);
-        let x2 = ((time as f32) / 2.0 + m - 1_f32).ceil().clamp(0_f32, time as f32);
-        let result = (x2 - x1 + 1_f32).floor() as usize;
+        let m = ((time * time / 4 - distance) as f64).sqrt();
+        let x1 = ((time as f64) / 2.0 - m + 1_f64).floor().clamp(0_f64, time as f64);
+        let x2 = ((time as f64) / 2.0 + m - 1_f64).ceil().clamp(0_f64, time as f64);
+        let result = (x2 - x1 + 1_f64).floor() as usize;
         println!("time = {}, distance = {}, m = {}, x1 = {}, x2 = {}: result = {}", time, distance, m, x1, x2, result);
         result
     }
