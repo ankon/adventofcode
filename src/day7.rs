@@ -21,12 +21,55 @@ impl Game {
     fn new(hand: &str, bid: usize) -> Self {
         Game { hand: hand.chars().collect(), bid }
     }
+}
 
-    fn classify(&self) -> Type {
+impl std::cmp::PartialEq for Game {
+    fn eq(&self, other: &Self) -> bool {
+        self.hand == other.hand
+    }
+}
+
+trait GameRules {
+    fn card_order(&self) -> &str;
+    fn classify(&self, hand: &[char]) -> Type;
+
+    fn cmp_game(&self, a: &Game, b: &Game) -> Option<std::cmp::Ordering> {
+        print!("comparing {:?} and {:?}: ", a, b);
+        // Compare the hand first by their classification
+        let a_hand = self.classify(&a.hand);
+        let b_hand = self.classify(&b.hand);
+        if a_hand != b_hand {
+            let result = a_hand.partial_cmp(&b_hand);
+            println!("different hand types ({:?} vs {:?}: {:?})", a_hand, b_hand, result);
+            return result;
+        }
+        // If that's still equal, compare the cards, in order.
+        for (a_card, b_card) in a.hand.iter().zip(b.hand.iter()) {
+            if a_card != b_card {
+                let result = self.card_order().find(*a_card).partial_cmp(&self.card_order().find(*b_card));
+                println!("different cards ({} vs {}: {:?})", a_card, b_card, result);
+                return result;
+            }
+        }
+
+        // If we get here, the hands are equal.
+        println!("equal");
+        Some(std::cmp::Ordering::Equal)
+    }
+}
+
+struct NoJokerRules {}
+
+impl GameRules for NoJokerRules {
+    fn card_order(&self) -> &str {
+        "23456789TJQKA"
+    }
+
+    fn classify(&self, hand: &[char]) -> Type {
         // Count the number of occurrences of each card, and then check
         // the number of occurrences of each number of occurrences.
         let mut counts = [0; 13];
-        for card in &self.hand {
+        for card in hand {
             match card {
                 'A' => counts[12] += 1,
                 'K' => counts[11] += 1,
@@ -62,37 +105,64 @@ impl Game {
     }
 }
 
-impl std::cmp::PartialEq for Game {
-    fn eq(&self, other: &Self) -> bool {
-        self.hand == other.hand
+struct JokerRules {}
+
+impl GameRules for JokerRules {
+    fn card_order(&self) -> &str {
+        "J23456789TQKA"
     }
-}
 
-impl std::cmp::PartialOrd for Game {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        static CARD_ORDER: &str = "23456789TJQKA";
-
-        print!("comparing {:?} and {:?}: ", self, other);
-        // Compare the hand first by their classification
-        let self_hand = self.classify();
-        let other_hand = other.classify();
-        if self_hand != other_hand {
-            let result = self_hand.partial_cmp(&other_hand);
-            println!("different hand types ({:?} vs {:?}: {:?})", self_hand, other_hand, result);
-            return result;
-        }
-        // If that's still equal, compare the cards, in order.
-        for (self_card, other_card) in self.hand.iter().zip(other.hand.iter()) {
-            if self_card != other_card {
-                let result = CARD_ORDER.find(*self_card).partial_cmp(&CARD_ORDER.find(*other_card));
-                println!("different cards ({} vs {}: {:?})", self_card, other_card, result);
-                return result;
+    fn classify(&self, hand: &[char]) -> Type {
+        // Count the number of occurrences of each card, and then check
+        // the number of occurrences of each number of occurrences.
+        let mut counts = [0; 13];
+        for card in hand {
+            match card {
+                'A' => counts[12] += 1,
+                'K' => counts[11] += 1,
+                'Q' => counts[10] += 1,
+                'J' => counts[9] += 1,
+                'T' => counts[8] += 1,
+                _ => counts[card.to_digit(10).unwrap() as usize - 2] += 1,
             }
         }
 
-        // If we get here, the hands are equal.
-        println!("equal");
-        Some(std::cmp::Ordering::Equal)
+        // The jokers can be used to replace any card, so we can just add them
+        // to the counts as long as we don't use too many of them.
+        let joker_count = counts[9];
+        print!("joker_count = {}, counts = {:?}", joker_count, counts);
+        for (i, count) in counts.iter_mut().enumerate() {
+            if i != 9 {
+                *count += joker_count;
+            }
+        }
+        println!(" -> {:?}", counts);
+
+        let mut number_of_occurrences = [0; 6];
+        for count in &counts {
+            number_of_occurrences[*count] += 1;
+        }
+        println!("number_of_occurrences = {:?}", number_of_occurrences);
+
+        if number_of_occurrences[5] == 1 {
+            return Type::FiveOfAKind;
+        }
+        if number_of_occurrences[4] == 1 {
+            return Type::FourOfAKind;
+        }
+        if number_of_occurrences[3] == 1 && number_of_occurrences[2] == 1 {
+            return Type::FullHouse;
+        }
+        if number_of_occurrences[3] == 1 {
+            return Type::ThreeOfAKind;
+        }
+        if number_of_occurrences[2] == 2 {
+            return Type::TwoPairs;
+        }
+        if number_of_occurrences[2] == 1 {
+            return Type::OnePair;
+        }
+        Type::HighCard
     }
 }
 
@@ -117,9 +187,9 @@ impl std::str::FromStr for GameList {
 }
 
 impl GameList {
-    fn winnings(&mut self) -> usize {
+    fn winnings(&mut self, rules: &dyn GameRules) -> usize {
         // Sort the games by their rank, and then calculate the winnings.
-        self.games.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        self.games.sort_by(|a, b| rules.cmp_game(a, b).unwrap());
         println!("games = {:?}", self.games);
 
         let mut result = 0;
@@ -134,7 +204,8 @@ pub fn main() {
     match std::fs::read_to_string("day7.input") {
         Ok(input) => {
             if let Ok(mut game_list) = input.parse::<GameList>() {
-                println!("total winnings (part 1) = {}", game_list.winnings());
+                println!("total winnings (no jokers) = {}", game_list.winnings(&NoJokerRules {}));
+                println!("total winnings (jokers) = {}", game_list.winnings(&JokerRules {}));
             }
         },
         Err(reason) => println!("error = {}", reason)
@@ -145,38 +216,47 @@ pub fn main() {
 mod tests {
     use super::*;
 
+    static DATA: &str = "32T3K 765
+T55J5 684
+KK677 28
+KTJJT 220
+QQQJA 483";
+
     #[test]
-    fn game_classify_tests() {
-        assert_eq!(Game::new("AAAAA", 0).classify(), Type::FiveOfAKind);
-        assert_eq!(Game::new("AA8AA", 0).classify(), Type::FourOfAKind);
-        assert_eq!(Game::new("23332", 0).classify(), Type::FullHouse);
-        assert_eq!(Game::new("TTT98", 0).classify(), Type::ThreeOfAKind);
-        assert_eq!(Game::new("23432", 0).classify(), Type::TwoPairs);
-        assert_eq!(Game::new("A23A4", 0).classify(), Type::OnePair);
-        assert_eq!(Game::new("23456", 0).classify(), Type::HighCard);
+    fn no_joker_rules_classify() {
+        let rules = NoJokerRules {};
+        assert_eq!(rules.classify(&"AAAAA".chars().collect::<Vec<char>>()), Type::FiveOfAKind);
+        assert_eq!(rules.classify(&"AA8AA".chars().collect::<Vec<char>>()), Type::FourOfAKind);
+        assert_eq!(rules.classify(&"23332".chars().collect::<Vec<char>>()), Type::FullHouse);
+        assert_eq!(rules.classify(&"TTT98".chars().collect::<Vec<char>>()), Type::ThreeOfAKind);
+        assert_eq!(rules.classify(&"23432".chars().collect::<Vec<char>>()), Type::TwoPairs);
+        assert_eq!(rules.classify(&"A23A4".chars().collect::<Vec<char>>()), Type::OnePair);
+        assert_eq!(rules.classify(&"23456".chars().collect::<Vec<char>>()), Type::HighCard);
     }
 
     #[test]
-    fn game_partial_ord_tests() {
+    fn no_joker_rules_cmp_game() {
+        let rules = NoJokerRules {};
+
         // So, 33332 and 2AAAA are both four of a kind hands, but 33332 is stronger because its first card is stronger.
-        assert!(Game::new("33332", 0) > Game::new("2AAAA", 0));
+        assert!(rules.cmp_game(&Game::new("33332", 0), &Game::new("2AAAA", 0)).unwrap() == std::cmp::Ordering::Greater);
         // Similarly, 77888 and 77788 are both a full house, but 77888 is stronger because its third card is stronger (and both hands have the same first and second card).
-        assert!(Game::new("77888", 0) > Game::new("77788", 0));
+        assert!(rules.cmp_game(&Game::new("77888", 0), &Game::new("77788", 0)).unwrap() == std::cmp::Ordering::Greater);
 
         // From failed attempts:
-        assert!(Game::new("22272", 0) > Game::new("22262", 0));
-        assert!(Game::new("22262", 0) < Game::new("22272", 0));
+        assert!(rules.cmp_game(&Game::new("22272", 0), &Game::new("22262", 0)).unwrap() == std::cmp::Ordering::Greater);
+        assert!(rules.cmp_game(&Game::new("22262", 0), &Game::new("22272", 0)).unwrap() == std::cmp::Ordering::Less);
     }
 
     #[test]
-    fn game_list_ordering_tests() {
+    fn no_joker_rules_game_ordering() {
         let mut game_list = GameList { games: vec![
             Game::new("JJJJJ", 0),
             Game::new("2222T", 0),
             Game::new("22272", 0),
             Game::new("22262", 0),
         ]};
-        game_list.winnings();
+        game_list.winnings(&NoJokerRules {});
         assert_eq!(game_list.games, vec![
             Game::new("2222T", 0),
             Game::new("22262", 0),
@@ -187,11 +267,27 @@ mod tests {
 
     #[test]
     fn part1_example() {
-        static DATA: &str = "32T3K 765
-T55J5 684
-KK677 28
-KTJJT 220
-QQQJA 483";
-        assert_eq!(DATA.parse::<GameList>().ok().unwrap().winnings(), 6440);
+        assert_eq!(DATA.parse::<GameList>().ok().unwrap().winnings(&NoJokerRules {}), 6440);
+    }
+
+    #[test]
+    fn joker_rules_classify() {
+        let rules = JokerRules {};
+        assert_eq!(rules.classify(&"QJJQ2".chars().collect::<Vec<char>>()), Type::FourOfAKind);
+        assert_eq!(rules.classify(&"KTJJT".chars().collect::<Vec<char>>()), Type::FourOfAKind);
+        assert_eq!(rules.classify(&"T55J5".chars().collect::<Vec<char>>()), Type::FourOfAKind);
+    }
+
+    #[test]
+    fn joker_rules_cmp_game() {
+        let rules = JokerRules {};
+
+        // JKKK2 is weaker than QQQQ2 because J is weaker than Q.
+        assert!(rules.cmp_game(&Game::new("JKKK2", 0), &Game::new("QQQQ2", 0)).unwrap() == std::cmp::Ordering::Less);
+    }
+
+    #[test]
+    fn part2_example() {
+        assert_eq!(DATA.parse::<GameList>().ok().unwrap().winnings(&JokerRules {}), 5905);
     }
 }
