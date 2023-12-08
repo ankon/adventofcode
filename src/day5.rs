@@ -1,3 +1,5 @@
+extern crate muldiv;
+use muldiv::MulDiv;
 use std::{collections::HashMap, cmp::min};
 
 #[derive(Debug)]
@@ -42,7 +44,7 @@ impl AlmanacMap {
     }
 
     fn lookup(&self, key: usize) -> usize {
-        println!("{}::lookup({})", self.name, key);
+        // println!("{}::lookup({})", self.name, key);
         for range in &self.ranges {
             if let Some(mapped) = range.lookup(key) {
                 return mapped;
@@ -114,25 +116,37 @@ impl std::str::FromStr for Almanac {
 }
 
 impl Almanac {
-    fn mapping(&self, from: &str, to: &str) -> Option<Box<dyn Fn(usize) -> usize + '_>> {
-        if from == to {
-            return Some(Box::new(|v| v))
-        }
-
-        println!("mapping({}, {})?", from, to);
+    fn find_map(&self, from: &str) -> Option<(&str, &AlmanacMap)> {
         for m in self.maps.values() {
             if let Some((map_from, map_to)) = m.name.split_once("-to-") {
-                if map_from != from {
-                    continue;
-                }
-                if let Some(result) = self.mapping(map_to, to) {
-                    let composed = move |v| result(m.lookup(v));
-                    return Some(Box::new(composed))
+                if map_from == from {
+                    return Some((map_to, m))
                 }
             }
         }
-        println!("[x] not found");
         None
+    }
+
+    fn mapping<'a>(&'a self, from: &'a str, to: &'a str) -> impl Fn(usize) -> usize + 'a  {
+        let mut next_from = from;
+        let mut maps = vec![];
+
+        while next_from != to {
+            println!("mapping: {} -> {}", next_from, to);
+            if let Some((map_to, m)) = self.find_map(next_from) {
+                // This is the next map to follow
+                maps.push(m);
+                next_from = map_to;
+            }
+        }
+
+        move |v| {
+            let mut result = v;
+            for m in maps.iter() {
+                result = m.lookup(result)
+            }
+            result
+        }
     }
 
     fn lowest_location(&self, use_ranges: bool) -> usize {
@@ -140,27 +154,28 @@ impl Almanac {
         // to a "-to-location" map. We can then apply the same path
         // for each of the seeds, and output the minimum location value.
         let mut result = std::usize::MAX;
-        if let Some(map) = self.mapping("seed", "location") {
-            if use_ranges {
-                let mut i = 0;
-                while i < self.seeds.len() {
-                    let start = self.seeds[i];
-                    let length = self.seeds[i+1];
-                    i += 2;
+        let map = self.mapping("seed", "location");
+        if use_ranges {
+            let mut i = 0;
+            while i < self.seeds.len() {
+                let start = self.seeds[i];
+                let length = self.seeds[i+1];
+                i += 2;
 
-                    for j in start..start+length {
-                        result = min(result, map(j));
+                for j in 0..length {
+                    if j % 1000 == 0 {
+                        print!("\rscanning range {}..{}: {}%", start, start + length, (j as u64).mul_div_floor(100, length as u64).unwrap());
                     }
+                    result = min(result, map(start + j));
                 }
-            } else {
-                for i in &self.seeds {
-                    result = min(result, map(*i));
-                }
+                println!()
             }
-            return result
+        } else {
+            for i in &self.seeds {
+                result = min(result, map(*i));
+            }
         }
-
-        panic!("Cannot find a path")
+        result
     }
 }
 
