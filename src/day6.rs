@@ -50,6 +50,12 @@ impl RaceTable {
         }
         result
     }
+
+    fn part2(&self) -> usize {
+        let time = self.races.iter().map(|(time, _)| format!("{}", time)).collect::<Vec<String>>().join("").parse::<usize>().unwrap();
+        let distance = self.races.iter().map(|(_, distance)| format!("{}", distance)).collect::<Vec<String>>().join("").parse::<usize>().unwrap();
+        Self::number_of_ways_to_beat_the_record(time, distance)
+    }
 }
 
 pub fn main() {
@@ -57,6 +63,7 @@ pub fn main() {
         Ok(input) => {
             if let Ok(race_table) = input.parse::<RaceTable>() {
                 println!("product of number of ways to win races (part 1) = {}", race_table.product());
+                println!("big race (part 2) = {}", race_table.part2());
             }
         },
         Err(reason) => println!("error = {}", reason)
@@ -67,10 +74,16 @@ pub fn main() {
 mod tests {
     use super::*;
 
-    #[test]
-    fn test() {
-        static DATA: &str = "Time:      7  15   30
+    static DATA: &str = "Time:      7  15   30
 Distance:  9  40  200";
+
+    #[test]
+    fn test_part1() {
         assert_eq!(DATA.parse::<RaceTable>().ok().unwrap().product(), 288);
+    }
+
+    #[test]
+    fn test_part2() {
+        assert_eq!(DATA.parse::<RaceTable>().ok().unwrap().part2(), 71503);
     }
 }
