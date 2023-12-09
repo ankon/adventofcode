@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use num::integer::lcm;
 
 struct Network {
     nodes: HashMap<String, (String, String)>
@@ -48,6 +49,36 @@ impl Network {
     fn all_end_with_z(nodes: &[&String]) -> bool {
         nodes.iter().all(|name| name.ends_with('Z'))
     }
+
+    fn cycle_length(&self, from: &str, instructions: &[char]) -> Option<usize> {
+        let mut steps = 0;
+        let mut current = from;
+        let mut ip = 0;
+        while !current.ends_with('Z') {
+            if let Some((left, right)) = self.nodes.get(current) {
+                let next = if instructions[ip] == 'L' { left } else { right };
+                current = next;
+                steps += 1;
+                ip = (ip + 1) % instructions.len();
+            } else {
+                return None
+            }
+        }
+        Some(steps)
+    }
+
+    fn calculate_ghost_steps(&self, instructions: &[char]) -> Option<usize> {
+        let cycle_lengths = self.nodes.keys()
+            .filter_map(|name| if name.ends_with('A') { Some(self.cycle_length(name, instructions)) } else { None })
+            .map(|cycle_length| cycle_length.unwrap())
+            .collect::<Vec<usize>>();
+
+        let mut result = lcm(cycle_lengths[0], cycle_lengths[1]);
+        for cycle_length in cycle_lengths.iter().skip(2) {
+            result = lcm(result, *cycle_length);
+        }
+        Some(result)
+    }
 }
 
 impl std::str::FromStr for Network {
@@ -81,7 +112,7 @@ pub fn main() {
                 let network = network_data.parse::<Network>().unwrap();
 
                 println!("number of steps from AAA to ZZZ (part 1) = {}", network.count_steps("AAA", "ZZZ", &instructions.chars().collect::<Vec<char>>()).unwrap());
-                println!("number of ghost steps (part 2) = {}", network.count_ghost_steps(&instructions.chars().collect::<Vec<char>>()).unwrap());
+                println!("number of ghost steps (part 2, calculated) = {}", network.calculate_ghost_steps(&instructions.chars().collect::<Vec<char>>()).unwrap());
             }
         },
         Err(reason) => println!("error = {}", reason)
@@ -101,7 +132,7 @@ DDD = (DDD, DDD)
 EEE = (EEE, EEE)
 GGG = (GGG, GGG)
 ZZZ = (ZZZ, ZZZ)";
-        assert_eq!(NETWORK_DATA.parse::<Network>().ok().unwrap().count_steps("AAA", "ZZZ", &['R', 'L']), Some(2))
+        assert_eq!(NETWORK_DATA.parse::<Network>().ok().unwrap().count_steps("AAA", "ZZZ", &['R', 'L']), Some(2));
     }
 
     #[test]
@@ -109,7 +140,7 @@ ZZZ = (ZZZ, ZZZ)";
         static NETWORK_DATA: &str = "AAA = (BBB, BBB)
 BBB = (AAA, ZZZ)
 ZZZ = (ZZZ, ZZZ)";
-        assert_eq!(NETWORK_DATA.parse::<Network>().ok().unwrap().count_steps("AAA", "ZZZ", &['L', 'L', 'R']), Some(6))
+        assert_eq!(NETWORK_DATA.parse::<Network>().ok().unwrap().count_steps("AAA", "ZZZ", &['L', 'L', 'R']), Some(6));
     }
 
     #[test]
@@ -122,6 +153,7 @@ ZZZ = (ZZZ, ZZZ)";
 22C = (22Z, 22Z)
 22Z = (22B, 22B)
 XXX = (XXX, XXX)";
-        assert_eq!(NETWORK_DATA.parse::<Network>().ok().unwrap().count_ghost_steps(&['L', 'R']), Some(6))
+        assert_eq!(NETWORK_DATA.parse::<Network>().ok().unwrap().count_ghost_steps(&['L', 'R']), Some(6));
+        assert_eq!(NETWORK_DATA.parse::<Network>().ok().unwrap().calculate_ghost_steps(&['L', 'R']), Some(6));
     }
 }
