@@ -3,34 +3,45 @@ struct Series {
     data: Vec<isize>,
 }
 
-impl Series {
-    pub fn extrapolate_next_value(&self) -> isize {
-        Series::extrapolate(&self.data)
+fn differences(series: &Vec<isize>) -> Vec<isize> {
+    let mut result = Vec::new();
+    for i in 0..series.len() - 1 {
+        result.push(series[i + 1] - series[i]);
+    }
+    result
+}
+
+fn extrapolate_next_value(series: &Vec<isize>) -> isize {
+    // Build up the difference series. When all values are 0, go back, and extrapolate.
+    if all_zeros(series) {
+        return 0
     }
 
-    fn extrapolate(series: &Vec<isize>) -> isize {
-        // Build up the difference series. When all values are 0, go back, and extrapolate.
-        if Series::all_zeros(&series) {
-            return 0
-        }
+    // Calculate the differences, and extrapolate that.
+    let differences = differences(series);
+    let next_value = extrapolate_next_value(&differences);
+    next_value + series[series.len() - 1]
+}
 
-        // Calculate the differences, and extrapolate that.
-        let mut differences = Vec::new();
-        for i in 0..series.len() - 1 {
-            differences.push(series[i + 1] - series[i]);
-        }
-        let next_value = Series::extrapolate(&differences);
-        next_value + series[series.len() - 1]
+fn extrapolate_previous_value(series: &Vec<isize>) -> isize {
+    // Build up the difference series. When all values are 0, go back, and extrapolate.
+    if all_zeros(series) {
+        return 0
     }
 
-    fn all_zeros(series: &Vec<isize>) -> bool {
-        for value in series {
-            if *value != 0 {
-                return false
-            }
+    // Calculate the differences, and extrapolate that.
+    let differences = differences(series);
+    let previous_value = extrapolate_previous_value(&differences);
+    series[0] - previous_value
+}
+
+fn all_zeros(series: &Vec<isize>) -> bool {
+    for value in series {
+        if *value != 0 {
+            return false
         }
-        true
     }
+    true
 }
 
 impl std::str::FromStr for Series {
@@ -45,11 +56,11 @@ impl std::str::FromStr for Series {
     }
 }
 
-fn sum_of_extrapolated_values(input: &str) -> isize {
+fn sum_of_extrapolated_values(input: &str, extrapolate: impl Fn(&Vec<isize>) -> isize) -> isize {
     let mut result = 0;
     for line in input.lines() {
         if let Ok(series) = line.parse::<Series>() {
-            result += series.extrapolate_next_value();
+            result += extrapolate(&series.data);
         }
     }
     result
@@ -58,7 +69,8 @@ fn sum_of_extrapolated_values(input: &str) -> isize {
 pub fn main() {
     match std::fs::read_to_string("day9.input") {
         Ok(input) => {
-            println!("part1 = {}", sum_of_extrapolated_values(&input));
+            println!("part1 = {}", sum_of_extrapolated_values(&input, extrapolate_next_value));
+            println!("part2 = {}", sum_of_extrapolated_values(&input, extrapolate_previous_value))
         },
         Err(reason) => println!("error = {}", reason)
     }
@@ -74,6 +86,11 @@ mod tests {
 
     #[test]
     fn part1_example() {
-        assert_eq!(sum_of_extrapolated_values(DATA), 114);
+        assert_eq!(sum_of_extrapolated_values(DATA, extrapolate_next_value), 114);
+    }
+
+    #[test]
+    fn part2_example() {
+        assert_eq!(sum_of_extrapolated_values(DATA, extrapolate_previous_value), 2);
     }
 }
