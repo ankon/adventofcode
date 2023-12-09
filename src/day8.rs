@@ -21,6 +21,33 @@ impl Network {
         }
         Some(steps)
     }
+
+    fn count_ghost_steps(&self, instructions: &[char]) -> Option<usize> {
+        let mut steps = 0;
+        let mut current = self.nodes.keys().filter(|name| name.ends_with('A')).collect::<Vec<&String>>();
+        let mut ip = 0;
+        while !Self::all_end_with_z(&current) {
+            // Process all nodes
+            for node in current.iter_mut() {
+                if let Some((left, right)) = self.nodes.get(*node) {
+                    let next = if instructions[ip] == 'L' { left } else { right };
+                    *node = next;
+                } else {
+                    return None
+                }
+            }
+            steps += 1;
+            ip = (ip + 1) % instructions.len();
+            if ip == 0 {
+                println!("steps = {}, current = {:?}", steps, current)
+            }
+        }
+        Some(steps)
+    }
+
+    fn all_end_with_z(nodes: &[&String]) -> bool {
+        nodes.iter().all(|name| name.ends_with('Z'))
+    }
 }
 
 impl std::str::FromStr for Network {
@@ -54,6 +81,7 @@ pub fn main() {
                 let network = network_data.parse::<Network>().unwrap();
 
                 println!("number of steps from AAA to ZZZ (part 1) = {}", network.count_steps("AAA", "ZZZ", &instructions.chars().collect::<Vec<char>>()).unwrap());
+                println!("number of ghost steps (part 2) = {}", network.count_ghost_steps(&instructions.chars().collect::<Vec<char>>()).unwrap());
             }
         },
         Err(reason) => println!("error = {}", reason)
@@ -82,5 +110,18 @@ ZZZ = (ZZZ, ZZZ)";
 BBB = (AAA, ZZZ)
 ZZZ = (ZZZ, ZZZ)";
         assert_eq!(NETWORK_DATA.parse::<Network>().ok().unwrap().count_steps("AAA", "ZZZ", &['L', 'L', 'R']), Some(6))
+    }
+
+    #[test]
+    fn part2_example1() {
+        static NETWORK_DATA: &str = "11A = (11B, XXX)
+11B = (XXX, 11Z)
+11Z = (11B, XXX)
+22A = (22B, XXX)
+22B = (22C, 22C)
+22C = (22Z, 22Z)
+22Z = (22B, 22B)
+XXX = (XXX, XXX)";
+        assert_eq!(NETWORK_DATA.parse::<Network>().ok().unwrap().count_ghost_steps(&['L', 'R']), Some(6))
     }
 }
