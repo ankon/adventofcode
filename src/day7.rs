@@ -116,50 +116,44 @@ impl GameRules for JokerRules {
         // Count the number of occurrences of each card, and then check
         // the number of occurrences of each number of occurrences.
         let mut counts = [0; 13];
+        let mut joker_count = 0;
         for card in hand {
             match card {
                 'A' => counts[12] += 1,
                 'K' => counts[11] += 1,
                 'Q' => counts[10] += 1,
-                'J' => counts[9] += 1,
+                'J' => joker_count += 1,
                 'T' => counts[8] += 1,
                 _ => counts[card.to_digit(10).unwrap() as usize - 2] += 1,
             }
         }
-
-        // The jokers can be used to replace any card, so we can just add them
-        // to the counts as long as we don't use too many of them.
-        let joker_count = counts[9];
-        print!("joker_count = {}, counts = {:?}", joker_count, counts);
-        for (i, count) in counts.iter_mut().enumerate() {
-            if i != 9 {
-                *count += joker_count;
-            }
-        }
-        println!(" -> {:?}", counts);
+        // println!("joker_count = {}, counts = {:?}", joker_count, counts);
 
         let mut number_of_occurrences = [0; 6];
         for count in &counts {
             number_of_occurrences[*count] += 1;
         }
-        println!("number_of_occurrences = {:?}", number_of_occurrences);
+        // println!("number_of_occurrences = {:?}", number_of_occurrences);
 
-        if number_of_occurrences[5] == 1 {
+        // Account for the jokers: Note that some cases are "theoretical" only, for instance
+        // with 4 jokers you certainly have 4 of a kind, but you also have one other card and so end up
+        // with 5 of a kind instead.
+        if number_of_occurrences[5] == 1 || (number_of_occurrences[4] == 1 && joker_count == 1) || (number_of_occurrences[3] == 1 && joker_count == 2) || (number_of_occurrences[2] == 1 && joker_count == 3) || joker_count == 4 || joker_count == 5 {
             return Type::FiveOfAKind;
         }
-        if number_of_occurrences[4] == 1 {
+        if number_of_occurrences[4] == 1 || (number_of_occurrences[3] == 1 && joker_count == 1) || (number_of_occurrences[2] == 1 && joker_count == 2) || joker_count == 3 || joker_count == 4 {
             return Type::FourOfAKind;
         }
-        if number_of_occurrences[3] == 1 && number_of_occurrences[2] == 1 {
+        if (number_of_occurrences[3] == 1 && number_of_occurrences[2] == 1) || (number_of_occurrences[2] == 2 && joker_count == 1) || (number_of_occurrences[2] == 1 && joker_count == 2) || joker_count == 3 {
             return Type::FullHouse;
         }
-        if number_of_occurrences[3] == 1 {
+        if number_of_occurrences[3] == 1 || (number_of_occurrences[2] >= 1 && joker_count == 1) || joker_count == 2 || joker_count == 3 {
             return Type::ThreeOfAKind;
         }
-        if number_of_occurrences[2] == 2 {
+        if number_of_occurrences[2] == 2 || (number_of_occurrences[2] == 1 && joker_count == 1) {
             return Type::TwoPairs;
         }
-        if number_of_occurrences[2] == 1 {
+        if number_of_occurrences[2] == 1 || joker_count == 1 || joker_count == 2 {
             return Type::OnePair;
         }
         Type::HighCard
@@ -276,6 +270,11 @@ QQQJA 483";
         assert_eq!(rules.classify(&"QJJQ2".chars().collect::<Vec<char>>()), Type::FourOfAKind);
         assert_eq!(rules.classify(&"KTJJT".chars().collect::<Vec<char>>()), Type::FourOfAKind);
         assert_eq!(rules.classify(&"T55J5".chars().collect::<Vec<char>>()), Type::FourOfAKind);
+
+        assert_eq!(rules.classify(&"22J33".chars().collect::<Vec<char>>()), Type::FullHouse);
+        assert_eq!(rules.classify(&"26KQJ".chars().collect::<Vec<char>>()), Type::OnePair);
+        // This could make two pairs, but it makes a three-of-kind instead as that is higher in rank.
+        assert_eq!(rules.classify(&"223JA".chars().collect::<Vec<char>>()), Type::ThreeOfAKind);
     }
 
     #[test]
@@ -284,6 +283,37 @@ QQQJA 483";
 
         // JKKK2 is weaker than QQQQ2 because J is weaker than Q.
         assert!(rules.cmp_game(&Game::new("JKKK2", 0), &Game::new("QQQQ2", 0)).unwrap() == std::cmp::Ordering::Less);
+    }
+
+    #[test]
+    fn joker_rules_game_ordering() {
+        let mut game_list = GameList { games: vec![
+            Game::new("32T3K", 0),
+            Game::new("T55J5", 0),
+            Game::new("KK677", 0),
+            Game::new("KTJJT", 0),
+            Game::new("QQQJA", 0),
+        ]};
+        game_list.winnings(&JokerRules {});
+        assert_eq!(game_list.games, vec![
+            Game::new("32T3K", 0),
+            Game::new("KK677", 0),
+            Game::new("T55J5", 0),
+            Game::new("QQQJA", 0),
+            Game::new("KTJJT", 0),
+        ]);
+    }
+
+    #[test]
+    fn part2_jokers_classify() {
+        match std::fs::read_to_string("day7-jokers.input") {
+            Ok(input) => {
+                for hand in input.split_ascii_whitespace() {
+                    println!("{} = {:?}", hand, JokerRules {}.classify(&hand.chars().collect::<Vec<char>>()));
+                }
+            },
+            Err(reason) => println!("error = {}", reason)
+        }
     }
 
     #[test]
