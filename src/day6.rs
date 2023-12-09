@@ -7,8 +7,8 @@ impl std::str::FromStr for RaceTable {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         if let Some((times_line, distances_line)) = s.split_once('\n') {
-            let times = times_line.split_ascii_whitespace().skip(1).map(|s| s.parse::<usize>()).collect::<Result<Vec<usize>, _>>().map_err(|_| "cannot parse times")?;
-            let distances = distances_line.split_ascii_whitespace().skip(1).map(|s| s.parse::<usize>()).collect::<Result<Vec<usize>, _>>().map_err(|_| "cannot parse distances")?;
+            let times = times_line.split_ascii_whitespace().skip(1).map(usize::from_str).collect::<Result<Vec<usize>, _>>().map_err(|_| "cannot parse times")?;
+            let distances = distances_line.split_ascii_whitespace().skip(1).map(usize::from_str).collect::<Result<Vec<usize>, _>>().map_err(|_| "cannot parse distances")?;
             if times.len() != distances.len() {
                 return Err("mismatch between times and distances")
             }
