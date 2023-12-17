@@ -204,7 +204,7 @@ pub fn main() {
             let num_arrangements_part2: usize = input.split('\n').filter_map(|i| {
                 if let Some((p, g)) = i.split_once(' ') {
                     format!("{} {}", 
-                        p.repeat(5), 
+                        repeat_element(std::iter::once(p), 5).collect::<Vec<_>>().join("?"),
                         repeat_element(std::iter::once(g), 5).collect::<Vec<_>>().join(","), 
                     ).parse::<ConditionRecord>().ok()
                 } else {
