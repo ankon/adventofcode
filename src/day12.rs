@@ -104,9 +104,9 @@ impl ConditionRecord {
 
         states.iter().filter(|s| {
             let ok = !self.violates_constraints(s, false);
-            if ok {
-                println!("{}", Self::format_state(s));
-            }
+            // if ok {
+            //     println!("{}", Self::format_state(s));
+            // }
             ok
         }).count()
     }
@@ -192,10 +192,26 @@ fn num_arrangements(input: &str) -> usize {
     input.split('\n').map(ConditionRecord::from_str).map(|cr| cr.unwrap().num_arrangements()).sum()
 }
 
+// See https://stackoverflow.com/a/66482767/196315
+fn repeat_element<T: Clone>(it: impl Iterator<Item = T>, cnt: usize) -> impl Iterator<Item = T> {
+    it.flat_map(move |n| std::iter::repeat(n).take(cnt))
+}
+
 pub fn main() {
     match std::fs::read_to_string("day12.input") {
         Ok(input) => {
             println!("num_arrangements = {}", num_arrangements(&input));
+            let num_arrangements_part2: usize = input.split('\n').filter_map(|i| {
+                if let Some((p, g)) = i.split_once(' ') {
+                    format!("{} {}", 
+                        p.repeat(5), 
+                        repeat_element(std::iter::once(g), 5).collect::<Vec<_>>().join(","), 
+                    ).parse::<ConditionRecord>().ok()
+                } else {
+                    None
+                }
+            }).map(|cr| cr.num_arrangements()).sum();
+            println!("num_arrangements (part 2) = {}", num_arrangements_part2);
         },
         Err(reason) => println!("error = {}", reason)
     }
