@@ -16,7 +16,7 @@ impl Pattern {
     fn find_mirror_column(&self, print: bool) -> impl Iterator<Item = usize> {
         let mut result = vec![];
         let mut last = None;
-        for (i, c) in self.columns.iter().enumerate() {
+        'outer: for (i, c) in self.columns.iter().enumerate() {
             if print {
                 println!("find_mirror_column: i = {}, c = {}, last = {:?}", i, c, last);
             }
@@ -25,6 +25,17 @@ impl Pattern {
                     if print {
                         println!("find_mirror_column: found potential mirror line at i = {}", i);
                     }
+
+                    // Verify: The patterns must be the same now between this column and the previous column.
+                    for row in 0..self.pattern.len() {
+                        if self.pattern[row][i] != self.pattern[row][i - 1] {
+                            if print {
+                                println!("find_mirror_column: not matching pattern, i = {}, row = {}", i, row);
+                            }
+                            continue 'outer;
+                        }
+                    }
+
                     // Found a potential mirror line
                     // Iterate outwards from here
                     let mut found = true;
@@ -73,15 +84,23 @@ impl Pattern {
     fn find_mirror_row(&self, print: bool) -> impl Iterator<Item = usize> {
         let mut result = vec![];
         let mut last = None;
-        for (i, c) in self.rows.iter().enumerate() {
+        'outer: for (i, c) in self.rows.iter().enumerate() {
             if print {
-                println!("find_mirror_row: i = {}, c = {}, last = {:?}", i, c, last);
+                println!("find_mirror_row: row = \"{}\", i = {}, c = {}, last = {:?}", self.pattern[i].iter().collect::<String>(), i, c, last);
             }
             if let Some(l) = last {
                 if l == *c {
                     if print {
                         println!("find_mirror_row: found potential mirror line at i = {}", i);
                     }
+                    // Verify: The patterns must be the same now between this row and the previous row.
+                    if self.pattern[i] != self.pattern[i - 1] {
+                        if print {
+                            println!("find_mirror_row: not matching pattern, i = {}", i);
+                        }
+                        continue 'outer;
+                    }
+
                     // Found a potential mirror line
                     // Iterate outwards from here
                     let mut found = true;
@@ -131,9 +150,12 @@ impl Pattern {
         // Search until we find the same column twice: If it is a mirror line, then we can extend from there
         // and compare the columns. If both comparison directions hit the border, the line is a mirror, otherwise
         // proceed.
-        self.find_mirror_column(print).map(|column| (Some(column), None)).into_iter().chain(
-            self.find_mirror_row(print).map(|row| (None, Some(row))).into_iter()
+        self.find_mirror_row(print).map(|row| (None, Some(row))).chain(
+            self.find_mirror_column(print).map(|column| (Some(column), None))
         )
+        // self.find_mirror_column(print).map(|column| (Some(column), None)).chain(
+        //     self.find_mirror_row(print).map(|row| (None, Some(row)))
+        // )
     }
 }
 
@@ -315,4 +337,40 @@ mod tests {
         assert_eq!(pattern.find_mirror(true).collect::<Vec<_>>(), vec![(None, Some(4))]);
         print_pattern_with_row_indicator(&pattern, 4)
     }
+
+    #[test]
+    fn example1_test1() {
+        const INPUT: &str = "##...##..
+.##.#..#.
+.#.......
+...#.##.#
+##..#..#.
+.##..##..
+.#...##..
+#.#######
+....####.
+..##.##.#
+..##.##.#
+....####.
+#.#######
+.#...##..
+.##..##..
+#...#..#.
+...#.##.#";
+        let pattern = INPUT.parse::<Pattern>().unwrap();
+        assert_eq!(pattern.find_mirror(true).collect::<Vec<_>>(), vec![(Some(6), None)]);
+    }
+
+    #[test]
+    fn example1_test2() {
+        const INPUT: &str = "....#....##....
+.##..##.####.##
+#..#.#...##...#
+.##.####....###
+#..#.##.####.##
+#..###.#.##.#.#
+.##.##.##..####";
+            let pattern = INPUT.parse::<Pattern>().unwrap();
+            assert_eq!(pattern.find_mirror(true).collect::<Vec<_>>(), vec![(Some(2), None)]);
+        }
 }
