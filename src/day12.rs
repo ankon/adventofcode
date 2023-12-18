@@ -29,6 +29,7 @@ impl Display for Condition {
 }
 
 // State when searching for arrangements
+#[derive(Clone, Debug)]
 struct State {
     conditions: Vec<Condition>,
     unchecked_condition: Option<Condition>,
@@ -194,10 +195,33 @@ impl ConditionRecord {
     }
 
     pub fn num_arrangements(&self) -> usize {
-        self.arrangements().len()
+        self.arrangements(false).len()
     }
 
-    fn arrangements(&self) -> Vec<String> {
+    fn process_state(&self, s: State, c: Condition) -> Vec<State> {
+        let mut result = vec![];
+        match c {
+            Condition::Unknown => {
+                let mut s1 = s.and(Condition::Damaged);
+                if s1.check_constraints(&self.damaged_spring_groups, true, false) {
+                    result.push(s1);
+                }
+                let mut s2 = s.and(Condition::Operational);
+                if s2.check_constraints(&self.damaged_spring_groups, true, false) {
+                    result.push(s2);
+                }
+            },
+            c => {
+                let mut s1 = s.and(c);
+                if s1.check_constraints(&self.damaged_spring_groups, true, false) {
+                    result.push(s1);
+                }
+            }
+        }
+        result
+    }
+
+    fn arrangements(&self, print: bool) -> Vec<String> {
         // Stupid logic: Each '?' can be either '.' or '#'. So, try both, and then proceed
         // and see if _at the end_. Essentially we're building a matching automaton here?????!?!?!!
         // Each state is the conditions we found.
@@ -205,59 +229,19 @@ impl ConditionRecord {
 
         // Start out with one empty state:
         states.push(State::empty());
-        for c in &self.conditions {
-            let next_states: Vec<_> = states.iter().flat_map(|s| {
-                // if cfg!(test) {
-                //     print!("state = {}, c = {}", s, c);
-                // }
-                let new_states = match c {
-                    Condition::Unknown => {
-                        // if cfg!(test) {
-                        //     print!(": unknown");
-                        // }
-                        let mut tmp = vec![];
-                        let mut s1 = s.and(Condition::Damaged);
-                        if s1.check_constraints(&self.damaged_spring_groups, true, false) {
-                            // if cfg!(test) {
-                            //     print!(", s1 = {} is valid", s1);
-                            // }
-                            tmp.push(s1);
-                        }
-                        let mut s2 = s.and(Condition::Operational);
-                        if s2.check_constraints(&self.damaged_spring_groups, true, false) {
-                            // if cfg!(test) {
-                            //     print!(", s2 = {} is valid", s2);
-                            // }
-                            tmp.push(s2);
-                        }
-                        tmp
-                    },
-                    c => {
-                        // if cfg!(test) {
-                        //     print!(": definite");
-                        // }
-                        let mut s1 = s.and(*c);
-                        if s1.check_constraints(&self.damaged_spring_groups, true, false) {
-                            // if cfg!(test) {
-                            //     print!(", s1 = {} is valid", s1);
-                            // }
-                            vec![s1]
-                        } else {
-                            vec![]
-                        }
-                    }
-                };
-                // if cfg!(test) {
-                //     println!();
-                // }
-                new_states
-            }).collect();
-            // println!(" ... next_states = {}", next_states.iter().map(|s| self.format_state(s)).collect::<Vec<_>>().join(","));
+        for (i, c) in self.conditions.iter().enumerate() {
+            let next_states = &states
+                .drain(..)
+                .flat_map(|s| self.process_state(s, *c))
+                .collect::<Vec<_>>();
             if next_states.is_empty() {
                 println!("no more states, can return empty early");
                 return vec![];
             }
-            *states = next_states;
+            *states = next_states.to_vec();
+            if print {
+                println!("{}/{} |states| = {:?}", i, self.conditions.len(), states.len());
+            }
         }
 
         // Filter out the invalid states
@@ -271,6 +255,10 @@ impl ConditionRecord {
             } else {
                 // println!("state = {}: pruned, invalid at full", s);
             }
+        }
+
+        if print {
+            println!("|result| = {:?}", result.len());
         }
         result
     }
@@ -291,32 +279,23 @@ impl ConditionRecord {
         let initial_state = vec![];
         states.push(initial_state);
         for c in &self.conditions {
-            // println!("{:?} with states {}", c, states.iter().map(|s| Self::format_state(s)).collect::<Vec<_>>().join(","));
-
             // Modify the states depending on the condition
             // If we see a '.' or '#' then it will be added immediately to the states, which may
             // make some switch from "could work" to "invalid".
             // If we see a '?' we fork the state, and keep the the valid parts.
             let next_states: Vec<_> = states.iter().flat_map(|s| {
-                // println!(" ... looking at {}{}", Self::format_state(s), *c as u8 as char);
                 match c {
                     Condition::Unknown => {
                         let mut tmp = vec![];
                         let mut s1 = s.clone();
                         s1.push(Condition::Damaged);
-                        if self.violates_constraints(&s1, true) {
-                            // println!(" ... {:?} violates constraints", Self::format_state(&s1));
-                        } else {
-                            // println!(" ... {:?} is acceptable", Self::format_state(&s1));
+                        if !self.violates_constraints(&s1, true) {
                             tmp.push(s1);
                         }
 
                         let mut s2 = s.clone();
                         s2.push(Condition::Operational);
-                        if self.violates_constraints(&s2, true) {
-                            // println!(" ... {:?} violates constraints", Self::format_state(&s2));
-                        } else {
-                            // println!(" ... {:?} is acceptable", Self::format_state(&s2));
+                        if !self.violates_constraints(&s2, true) {
                             tmp.push(s2);
                         }
                         tmp
@@ -324,16 +303,14 @@ impl ConditionRecord {
                     _ => {
                         let mut s1 = s.clone();
                         s1.push(*c);
-                        if self.violates_constraints(&s1, true) {
-                            // println!(" ... {:?} violates constraints", Self::format_state(&s1));
-                            vec![]
-                        } else {
+                        if !self.violates_constraints(&s1, true) {
                             vec![s1]
+                        } else {
+                            vec![]
                         }
                     }
                 }
             }).collect();
-            // println!(" ... next_states = {}", next_states.iter().map(|s| self.format_state(s)).collect::<Vec<_>>().join(","));
             if next_states.is_empty() {
                 println!("no more states, can return 0 early");
                 return 0;
@@ -527,7 +504,7 @@ mod tests {
     fn part1_tests() {
         //assert_eq!("???.#??#.??? 1,1,2,1".parse::<ConditionRecord>().unwrap().num_arrangements(), 10);
         let cr = "##???#??#?????????#? 11,6".parse::<ConditionRecord>().unwrap();
-        assert_eq!(cr.arrangements(), &[
+        assert_eq!(cr.arrangements(false), &[
             "###########..######.",
             "###########...######",
         ]);
