@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
 enum Condition {
     Operational = '.' as isize,
     Damaged = '#' as isize,
@@ -29,13 +29,18 @@ impl Display for Condition {
 }
 
 // State when searching for arrangements
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq)]
 struct State {
     conditions: Vec<Condition>,
     unchecked_condition: Option<Condition>,
     last_damaged_count: usize,
     last_damaged_spring_groups_index: usize,
     invalid: bool,
+
+    // Number of states that collapsed into this one because
+    // they had the same last_damaged_spring_groups_index, last_damaged_count and
+    // last condition.
+    num_similar: usize,
 }
 
 impl State {
@@ -46,6 +51,7 @@ impl State {
             last_damaged_count: 0,
             last_damaged_spring_groups_index: 0,
             invalid: false,
+            num_similar: 0,
         }
     }
     fn and(&self, c: Condition) -> State {
@@ -61,6 +67,7 @@ impl State {
             last_damaged_count: self.last_damaged_count,
             last_damaged_spring_groups_index: self.last_damaged_spring_groups_index,
             invalid: false,
+            num_similar: self.num_similar,
         }
     }
 
@@ -160,7 +167,7 @@ impl State {
 impl Display for State {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let cond_str = std::str::from_utf8(&self.conditions.iter().map(|c| *c as u8).collect::<Vec<u8>>()).unwrap().to_string();
-        let r = write!(f, "\"{}\" (ldc = {}, i = {}, invalid = {}", cond_str, self.last_damaged_count, self.last_damaged_spring_groups_index, self.invalid);
+        let r = write!(f, "\"{}\" (ldc = {}, i = {}, invalid = {}, similar = {}", cond_str, self.last_damaged_count, self.last_damaged_spring_groups_index, self.invalid, self.num_similar);
         if r.is_err() {
             panic!("cannot format state");
         }
@@ -169,6 +176,80 @@ impl Display for State {
         } else {
             write!(f, ")")
         }
+    }
+}
+
+impl std::cmp::PartialEq for State {
+    fn eq(&self, other: &Self) -> bool {
+        if self.unchecked_condition.is_some() || other.unchecked_condition.is_some() {
+            panic!("cannot compare states with unchecked conditions");
+        }
+
+        // Easy things:
+        if self.invalid != other.invalid {
+            return false;
+        }
+        if self.conditions.len() != other.conditions.len() {
+            return false;
+        }
+        if self.last_damaged_count != other.last_damaged_count {
+            return false;
+        }
+        if self.last_damaged_spring_groups_index != other.last_damaged_spring_groups_index {
+            return false;
+        }
+
+        // Last condition must be the same:
+        match (self.conditions.last(), other.conditions.last()) {
+            (Some(last), Some(other_last)) => {
+                if last != other_last {
+                    return false;
+                }
+            },
+            (None, None) => {},
+            _ => return false,
+        }
+
+        // NB: We're not comparing num_similar, as that is just an internal
+        // multiplier.
+        true
+    }
+}
+
+impl std::cmp::PartialOrd for State {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        if self.unchecked_condition.is_some() || other.unchecked_condition.is_some() {
+            panic!("cannot compare states with unchecked conditions");
+        }
+
+        // First: Compare the parts we also use in the partial equality checks.
+        match self.invalid.partial_cmp(&other.invalid) {
+            Some(core::cmp::Ordering::Equal) => {}
+            ord => return ord,
+        }
+        match self.conditions.len().partial_cmp(&other.conditions.len()) {
+            Some(core::cmp::Ordering::Equal) => {}
+            ord => return ord,
+        }
+        match self.last_damaged_count.partial_cmp(&other.last_damaged_count) {
+            Some(core::cmp::Ordering::Equal) => {}
+            ord => return ord,
+        }
+        match self.last_damaged_spring_groups_index.partial_cmp(&other.last_damaged_spring_groups_index) {
+            Some(core::cmp::Ordering::Equal) => {}
+            ord => return ord,
+        }
+        match self.conditions.last().partial_cmp(&other.conditions.last()) {
+            Some(core::cmp::Ordering::Equal) => {}
+            ord => return ord,
+        }
+
+        // Rest "just" needs to be sane enough.
+        match self.conditions.partial_cmp(&other.conditions) {
+            Some(core::cmp::Ordering::Equal) => {}
+            ord => return ord,
+        }
+        self.num_similar.partial_cmp(&other.num_similar)
     }
 }
 
@@ -188,7 +269,7 @@ impl ConditionRecord {
     }
 
     pub fn num_arrangements(&self) -> usize {
-        Self::arrangements(&self.conditions, &self.damaged_spring_groups, self.repeat, false).len()
+        Self::arrangements(&self.conditions, &self.damaged_spring_groups, self.repeat, false).drain(..).fold(0, |acc, s| acc + s.num_similar + 1)
     }
 
     fn process_state(damaged_spring_groups: &[usize], s: State, c: Condition, print: bool) -> Vec<State> {
@@ -220,7 +301,7 @@ impl ConditionRecord {
         result
     }
 
-    fn arrangements(conditions: &[Condition], damaged_spring_groups: &[usize], repeat: usize, print: bool) -> Vec<String> {
+    fn arrangements(conditions: &[Condition], damaged_spring_groups: &[usize], repeat: usize, print: bool) -> Vec<State> {
         // Stupid logic: Each '?' can be either '.' or '#'. So, try both, and then proceed
         // and see if _at the end_. Essentially we're building a matching automaton here?????!?!?!!
         // Each state is the conditions we found.
@@ -231,18 +312,39 @@ impl ConditionRecord {
         states.push(State::empty());
         for r in 0..repeat {
             for (i, c) in conditions.iter().enumerate() {
-                let next_states = &states
+                let next_states = &mut states
                     .drain(..)
                     .flat_map(|s| Self::process_state(&repeated_damaged_spring_groups, s, *c, print))
                     .collect::<Vec<_>>();
-                if next_states.is_empty() {
-                    println!("no more states, can return empty early");
-                    return vec![];
-                }
-                *states = next_states.to_vec();
+
+                let next_states_len = next_states.len();
+
+                // Collapse states: Sort them, then drop equal ones and bump the num_similar counter. At the
+                // end we just count these counters when summing up.
+                states.sort_by(|a, b| a.partial_cmp(b).unwrap());
+                let collapsed_states = &next_states
+                    .drain(..)
+                    .fold(vec![], |mut acc: Vec<State>, s| {
+                        if let Some(last) = acc.last_mut() {
+                            if *last == s {
+                                last.num_similar += s.num_similar + 1;
+                                if print {
+                                    println!("... {} collapsed into {}", s, last);
+                                }
+                            } else {
+                                acc.push(s);
+                            }
+                        } else {
+                            acc.push(s);
+                        }
+                        acc
+                    });
+
                 if print {
-                    println!("{}/{}: {}/{} |states| = {:?}", r, repeat, i, conditions.len(), states.len());
+                    println!("{}/{}: {}/{} |next_states| = {:?}, |collapsed_states| = {:?}", r, repeat, i, conditions.len(), next_states_len, collapsed_states.len());
                 }
+
+                *states = collapsed_states.to_vec();
             }
 
             // Repeating adds a unknown condition, so process that.
@@ -254,47 +356,34 @@ impl ConditionRecord {
                     .drain(..)
                     .flat_map(|s| Self::process_state(&repeated_damaged_spring_groups, s, Condition::Unknown, print))
                     .collect::<Vec<_>>();
-                if next_states.is_empty() {
-                    println!("no more states, can return empty early");
-                    return vec![];
-                }
 
-                // Prune everything that doesn't have at least a remote chance: We should have roughly
-                // the same number of groups in this section than existed in the original damaged_spring_groups.
-                states.clear();
-                for s in next_states {
-                    // XXX: This is probably the same or related-to as last_damaged_group_index.
-                    // XXX: The problem is that we may have situations where the added Unknown actually makes some group
-                    //      possible -- but I don't see yet how.
-                    let expected_num_groups = damaged_spring_groups.len() * (r + 1);
-                    if s.last_damaged_spring_groups_index >= expected_num_groups - 1 {
-                        states.push(s.clone());
-                    }
-                }
+                // We could do the collapsing here, but it will happen in the next iteration anyways
+                // and shouldn't cost too much as we already did it just above.
+                *states = next_states.to_vec();
+            }
 
-                if print {
-                    println!("{}/{}: |states after repeat| = {:?}, dropped = {}", r, repeat, states.len(), next_states.len() - states.len());
-                }
+            if states.is_empty() {
+                println!("no more states, can return empty early");
+                return vec![];
             }
         }
 
         // Filter out the invalid states
-        let mut result = vec![];
+        let mut final_states = vec![];
         for s in states.iter_mut() {
             let valid = s.check_constraints(&repeated_damaged_spring_groups, false, false);
             if valid {
                 // println!("state = {}: counted, valid at full", s);
-                let cond_str = std::str::from_utf8(&s.conditions.iter().map(|c| *c as u8).collect::<Vec<u8>>()).unwrap().to_string();
-                result.push(cond_str);
+                final_states.push(s.to_owned());
             } else {
                 // println!("state = {}: pruned, invalid at full", s);
             }
         }
 
         if print {
-            println!("|result| = {:?}", result.len());
+            println!("|result| = {:?}", final_states);
         }
-        result
+        final_states
     }
 
     fn parse_state(s: &str) -> Vec<Condition> {
@@ -427,7 +516,7 @@ impl std::str::FromStr for ConditionRecord {
     }
 }
 
-fn num_arrangements(input: &str, repeat: usize) -> usize {
+fn num_arrangements(input: &str, repeat: usize, concurrent: u8) -> usize {
     let thread_count_arc = std::sync::Arc::new((std::sync::Mutex::new(0u8), std::sync::Condvar::new()));
 
     let mut v = vec![];
@@ -438,7 +527,7 @@ fn num_arrangements(input: &str, repeat: usize) -> usize {
                 let (num, cvar) = &*thread_count;
 
                 let mut start = cvar
-                    .wait_while(num.lock().unwrap(), |start| *start >= 32)
+                    .wait_while(num.lock().unwrap(), |start| *start >= concurrent)
                     .unwrap();
                 *start += 1;
                 drop(start);
@@ -469,7 +558,7 @@ pub fn main() {
     match std::fs::read_to_string("day12.input") {
         Ok(input) => {
             // println!("num_arrangements = {}", num_arrangements(&input, 1));
-            println!("num_arrangements (part 2) = {}", num_arrangements(&input, 5));
+            println!("num_arrangements (part 2) = {}", num_arrangements(&input, 5, 32));
         },
         Err(reason) => println!("error = {}", reason)
     }
@@ -566,17 +655,17 @@ mod tests {
         assert_eq!("????.######..#####. 1,6,5".parse::<ConditionRecord>().unwrap().num_arrangements(), 4);
         assert_eq!("?###???????? 3,2,1".parse::<ConditionRecord>().unwrap().num_arrangements(), 10);
 
-        assert_eq!(num_arrangements(DATA, 1), 21)
+        assert_eq!(num_arrangements(DATA, 1, 1), 21)
     }
 
     #[test]
     fn part1_tests() {
         //assert_eq!("???.#??#.??? 1,1,2,1".parse::<ConditionRecord>().unwrap().num_arrangements(), 10);
         let cr = "##???#??#?????????#? 11,6".parse::<ConditionRecord>().unwrap();
-        assert_eq!(ConditionRecord::arrangements(&cr.conditions, &cr.damaged_spring_groups, 1, false), &[
+        assert_eq!(ConditionRecord::arrangements(&cr.conditions, &cr.damaged_spring_groups, 1, false).len(), [
             "###########..######.",
             "###########...######",
-        ]);
+        ].len());
     }
 
     #[test]
@@ -594,7 +683,17 @@ mod tests {
         assert_eq!("????.######..#####. 1,6,5".parse::<ConditionRecord>().unwrap().repeat(5).num_arrangements(), 2500);
         assert_eq!("?###???????? 3,2,1".parse::<ConditionRecord>().unwrap().repeat(5).num_arrangements(), 506250);
 
-        assert_eq!(num_arrangements(DATA, 5), 525152)
+        assert_eq!(num_arrangements(DATA, 5, 1), 525152)
+    }
+
+    #[test]
+    fn part2_simple() {
+        let cr = "????.#...#... 4,1,1".parse::<ConditionRecord>().unwrap();
+        let states = ConditionRecord::arrangements(&cr.conditions, &cr.damaged_spring_groups, 5, true);
+        for s in &states {
+            println!("state = {}", s);
+        }
+        assert_eq!(states.iter().fold(0, |acc, s| acc + s.num_similar + 1), 16);
     }
 
     #[test]
