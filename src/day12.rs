@@ -198,23 +198,29 @@ impl ConditionRecord {
         self.arrangements(false).len()
     }
 
-    fn process_state(&self, s: State, c: Condition) -> Vec<State> {
+    fn process_state(&self, s: State, c: Condition, print: bool) -> Vec<State> {
         let mut result = vec![];
         match c {
             Condition::Unknown => {
                 let mut s1 = s.and(Condition::Damaged);
                 if s1.check_constraints(&self.damaged_spring_groups, true, false) {
                     result.push(s1);
+                } else if print {
+                    println!("... {} dropped", s1);
                 }
                 let mut s2 = s.and(Condition::Operational);
                 if s2.check_constraints(&self.damaged_spring_groups, true, false) {
                     result.push(s2);
+                } else if print {
+                    println!("... {} dropped", s2);
                 }
             },
             c => {
                 let mut s1 = s.and(c);
                 if s1.check_constraints(&self.damaged_spring_groups, true, false) {
                     result.push(s1);
+                } else if print {
+                    println!("... {} dropped", s1);
                 }
             }
         }
@@ -232,7 +238,7 @@ impl ConditionRecord {
         for (i, c) in self.conditions.iter().enumerate() {
             let next_states = &states
                 .drain(..)
-                .flat_map(|s| self.process_state(s, *c))
+                .flat_map(|s| self.process_state(s, *c, print))
                 .collect::<Vec<_>>();
             if next_states.is_empty() {
                 println!("no more states, can return empty early");
