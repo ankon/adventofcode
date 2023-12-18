@@ -58,6 +58,8 @@ impl ConditionRecord {
             // If we see a '.' or '#' then it will be added immediately to the states, which may
             // make some switch from "could work" to "invalid".
             // If we see a '?' we fork the state, and keep the the valid parts.
+            // Adding a '.' after a '.' will not actually change anything, so we can skip
+            // the checks in that case.
             let next_states: Vec<_> = states.iter().flat_map(|s| {
                 // println!(" ... looking at {}{}", Self::format_state(s), *c as u8 as char);
                 match c {
@@ -65,31 +67,33 @@ impl ConditionRecord {
                         let mut tmp = vec![];
                         let mut s1 = s.clone();
                         s1.push(Condition::Damaged);
-                        if self.violates_constraints(&s1, true) {
-                            // println!(" ... {:?} violates constraints", Self::format_state(&s1));
-                        } else {
+                        if !self.violates_constraints(&s1, true) {
                             // println!(" ... {:?} is acceptable", Self::format_state(&s1));
                             tmp.push(s1);
+                        } else {
+                            // println!(" ... {:?} violates constraints", Self::format_state(&s1));
                         }
 
+                        let last = s.last();
                         let mut s2 = s.clone();
                         s2.push(Condition::Operational);
-                        if self.violates_constraints(&s2, true) {
-                            // println!(" ... {:?} violates constraints", Self::format_state(&s2));
-                        } else {
+                        if (last.is_some_and(|lc| *lc == Condition::Operational) && *c == Condition::Operational) || !self.violates_constraints(&s2, true) {
                             // println!(" ... {:?} is acceptable", Self::format_state(&s2));
                             tmp.push(s2);
+                        } else {
+                            // println!(" ... {:?} violates constraints", Self::format_state(&s2));
                         }
                         tmp
                     },
                     _ => {
+                        let last = s.last();
                         let mut s1 = s.clone();
                         s1.push(*c);
-                        if self.violates_constraints(&s1, true) {
+                        if (last.is_some_and(|lc| *lc == Condition::Operational) && *c == Condition::Operational) || !self.violates_constraints(&s1, true) {
+                            vec![s1]
+                        } else {
                             // println!(" ... {:?} violates constraints", Self::format_state(&s1));
                             vec![]
-                        } else {
-                            vec![s1]
                         }
                     }
                 }
