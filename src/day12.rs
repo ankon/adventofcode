@@ -1,4 +1,4 @@
-use std::{str::FromStr, fmt::Display};
+use std::fmt::Display;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 enum Condition {
@@ -31,34 +31,32 @@ impl Display for Condition {
 // State when searching for arrangements
 struct State {
     conditions: Vec<Condition>,
+    unchecked_conditions: Vec<Condition>,
     last_damaged_count: usize,
     last_damaged_spring_groups_index: usize,
     invalid: bool,
-    needs_constraint_check: bool,
 }
 
 impl State {
     fn empty() -> State {
         State {
             conditions: vec![],
+            unchecked_conditions: vec![],
             last_damaged_count: 0,
             last_damaged_spring_groups_index: 0,
             invalid: false,
-            needs_constraint_check: false,
         }
     }
     fn and(&self, c: Condition) -> State {
         if self.invalid {
             panic!("cannot 'and' to an invalid state");
         }
-        let mut new_conditions = self.conditions.clone();
-        new_conditions.push(c);
         State {
-            conditions: new_conditions,
+            conditions: self.conditions.clone(),
+            unchecked_conditions: vec![c],
             last_damaged_count: self.last_damaged_count,
             last_damaged_spring_groups_index: self.last_damaged_spring_groups_index,
             invalid: false,
-            needs_constraint_check: true,
         }
     }
 
@@ -68,65 +66,90 @@ impl State {
     // If `partial` is true then the check accepts conditions that are incomplete and could be completed
     // to a full valid configuration, if it is false then the conditions must match perfectly.
     fn check_constraints(&mut self, damaged_spring_groups: &[usize], partial: bool) -> bool {
-        // Invalid states stay invalid, and we can skip checks when nothing has changed
+        // Invalid states stay invalid, and we can skip partial checks when nothing has changed
         // since the last check.
-        if self.invalid || !self.needs_constraint_check {
+        if self.invalid || (partial && self.unchecked_conditions.is_empty()) {
+            // if cfg!(test) {
+            //     println!("check_constraints({}): early exit", self);
+            // }
             return !self.invalid;
         }
 
-        // needs_constraint_check is true on a state that recently got a new condition, so we check
-        // whether the last condition is not breaking anything.
-        match self.conditions.last() {
-            Some(Condition::Operational) => {
-                // An operational condition was added, so any incomplete damaged group would now be complete and must match exactly
-                // the indicated group.
-                if self.last_damaged_count > 0 {
-                    // A group was open, close it and match it.
+        // Process all unchecked conditions
+        for c in self.unchecked_conditions.iter() {
+            // if cfg!(test) {
+            //     print!("check_constraints(): applying {}", c);
+            // }
+            match c {
+                Condition::Operational => {
+                    // An operational condition was added, so any incomplete damaged group would now be complete and must match exactly
+                    // the indicated group.
+                    if self.last_damaged_count > 0 {
+                        // A group was open, close it and match it.
+                        if let Some(expected_damaged_count) = damaged_spring_groups.get(self.last_damaged_spring_groups_index) {
+                            let result = *expected_damaged_count == self.last_damaged_count;
+                            self.invalid = !result;
+                        } else {
+                            // State is invalid: keep the constraint check flag on for now, so that the next one
+                            // will also flag it.
+                            self.invalid = true;
+                        }
+                        self.last_damaged_count = 0;
+                        self.last_damaged_spring_groups_index += 1;
+                    }
+                },
+                Condition::Damaged => {
+                    // A damaged condition was added, so we need to check whether that is still fitting the current index.
+                    self.last_damaged_count += 1;
                     if let Some(expected_damaged_count) = damaged_spring_groups.get(self.last_damaged_spring_groups_index) {
-                        let result = *expected_damaged_count == self.last_damaged_count;
+                        let result = if partial {
+                            *expected_damaged_count >= self.last_damaged_count
+                        } else {
+                            *expected_damaged_count == self.last_damaged_count
+                        };
                         self.invalid = !result;
                     } else {
                         // State is invalid: keep the constraint check flag on for now, so that the next one
                         // will also flag it.
                         self.invalid = true;
                     }
-                    self.last_damaged_count = 0;
-                    self.last_damaged_spring_groups_index += 1;
-                }
-            },
-            Some(Condition::Damaged) => {
-                // A damaged condition was added, so we need to check whether that is still fitting the current index.
-                self.last_damaged_count += 1;
-                if let Some(expected_damaged_count) = damaged_spring_groups.get(self.last_damaged_spring_groups_index) {
-                    let result = if partial {
-                        *expected_damaged_count >= self.last_damaged_count
-                    } else {
-                        *expected_damaged_count == self.last_damaged_count
-                    };
-                    self.invalid = !result;
-                } else {
-                    // State is invalid: keep the constraint check flag on for now, so that the next one
-                    // will also flag it.
-                    self.invalid = true;
-                }
-            },
-            Some(condition) => {
-                panic!("unexpected condition {}", condition);
-            },
-            None => {
-                // Nothing to do really, the thing is empty. But: How did you get here?
-                panic!("huh? state is empty");
-            },
+                },
+                condition => {
+                    panic!("unexpected condition {}", condition);
+                },
+            };
+            self.conditions.push(*c);
+            if self.invalid {
+                // if cfg!(test) {
+                //     println!(": invalid, breaking");
+                // }
+                break;
+            } else {
+                // if cfg!(test) {
+                //     println!()
+                // }
+            }
         }
-
-        // If we're not doing a partial check, then the group index should point after the end
-        // of the groups, i.e. there is no missing group.
-        if !self.invalid && !partial {
-            self.invalid = self.last_damaged_spring_groups_index >= damaged_spring_groups.len();
-        }
-
         // Mark check as done, and return whether we're now invalid or not.
-        self.needs_constraint_check = false;
+        self.unchecked_conditions.clear();
+
+        // If we're not doing a partial check, then the group index should point to the last group
+        // if the last condition was damaged, or to after the end so that there are no missing groups.
+        // println!("... invalid after applying unchecked = {}", self.invalid);
+        if !self.invalid && !partial {
+            // print!("... not partial, checking group index {}", self.last_damaged_spring_groups_index);
+            match self.conditions.last() {
+                Some(Condition::Damaged) => {
+                    // Invalid if not exactly pointing to the last.
+                    self.invalid = self.last_damaged_spring_groups_index != damaged_spring_groups.len() - 1;
+                },
+                _ => {
+                    // Empty or last one was operational, invalid if not after the end
+                    self.invalid = self.last_damaged_spring_groups_index != damaged_spring_groups.len();
+                },
+            };
+        }
+
         !self.invalid
     }
 }
@@ -134,7 +157,8 @@ impl State {
 impl Display for State {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let cond_str = std::str::from_utf8(&self.conditions.iter().map(|c| *c as u8).collect::<Vec<u8>>()).unwrap().to_string();
-        write!(f, "\"{}\" (ldc = {}, i = {}", cond_str, self.last_damaged_count, self.last_damaged_spring_groups_index)
+        let unchecked_cond_str = std::str::from_utf8(&self.unchecked_conditions.iter().map(|c| *c as u8).collect::<Vec<u8>>()).unwrap().to_string();
+        write!(f, "\"{}\" (ldc = {}, i = {}, invalid = {}, unchecked = {:?})", cond_str, self.last_damaged_count, self.last_damaged_spring_groups_index, self.invalid, unchecked_cond_str)
     }
 }
 
@@ -144,6 +168,22 @@ struct ConditionRecord {
 }
 
 impl ConditionRecord {
+    pub fn repeat(&self, n: usize) -> ConditionRecord {
+        let mut new_conditions = vec![];
+        for i in 0..n {
+            for c in &self.conditions {
+                new_conditions.push(*c);
+            }
+            if i != n-1 {
+                new_conditions.push(Condition::Unknown);
+            }
+        }
+        ConditionRecord {
+            conditions: new_conditions,
+            damaged_spring_groups: self.damaged_spring_groups.repeat(n,)
+        }
+    }
+
     pub fn num_arrangements(&self) -> usize {
         // Stupid logic: Each '?' can be either '.' or '#'. So, try both, and then proceed
         // and see if _at the end_. Essentially we're building a matching automaton here?????!?!?!!
@@ -154,28 +194,50 @@ impl ConditionRecord {
         states.push(State::empty());
         for c in &self.conditions {
             let next_states: Vec<_> = states.iter().flat_map(|s| {
-                match c {
+                // if cfg!(test) {
+                //     print!("state = {}, c = {}", s, c);
+                // }
+                let new_states = match c {
                     Condition::Unknown => {
+                        // if cfg!(test) {
+                        //     print!(": unknown");
+                        // }
                         let mut tmp = vec![];
                         let mut s1 = s.and(Condition::Damaged);
                         if s1.check_constraints(&self.damaged_spring_groups, true) {
+                            // if cfg!(test) {
+                            //     print!(", s1 = {} is valid", s1);
+                            // }
                             tmp.push(s1);
                         }
                         let mut s2 = s.and(Condition::Operational);
                         if s2.check_constraints(&self.damaged_spring_groups, true) {
+                            // if cfg!(test) {
+                            //     print!(", s2 = {} is valid", s2);
+                            // }
                             tmp.push(s2);
                         }
                         tmp
                     },
                     c => {
+                        // if cfg!(test) {
+                        //     print!(": definite");
+                        // }
                         let mut s1 = s.and(*c);
                         if s1.check_constraints(&self.damaged_spring_groups, true) {
+                            // if cfg!(test) {
+                            //     print!(", s1 = {} is valid", s1);
+                            // }
                             vec![s1]
                         } else {
                             vec![]
                         }
                     }
-                }
+                };
+                // if cfg!(test) {
+                //     println!();
+                // }
+                new_states
             }).collect();
             // println!(" ... next_states = {}", next_states.iter().map(|s| self.format_state(s)).collect::<Vec<_>>().join(","));
             if next_states.is_empty() {
@@ -187,8 +249,14 @@ impl ConditionRecord {
 
         let mut result = 0;
         for s in states.iter_mut() {
-            if s.check_constraints(&self.damaged_spring_groups, false) {
+            let valid = s.check_constraints(&self.damaged_spring_groups, false);
+            if valid {
+                // println!("state = {}: counted, valid at full", s);
                 result += 1;
+            } else {
+                // if cfg!(test) {
+                //     println!("state = {}: pruned, invalid at full", s);
+                // }
             }
         }
         result
@@ -219,30 +287,15 @@ impl std::str::FromStr for ConditionRecord {
     }
 }
 
-fn num_arrangements(input: &str) -> usize {
-    input.split('\n').map(ConditionRecord::from_str).map(|cr| cr.unwrap().num_arrangements()).sum()
-}
-
-// See https://stackoverflow.com/a/66482767/196315
-fn repeat_element<T: Clone>(it: impl Iterator<Item = T>, cnt: usize) -> impl Iterator<Item = T> {
-    it.flat_map(move |n| std::iter::repeat(n).take(cnt))
+fn num_arrangements(input: &str, repeat: usize) -> usize {
+    input.split('\n').map(str::parse::<ConditionRecord>).map(|cr| cr.unwrap().repeat(repeat).num_arrangements()).sum()
 }
 
 pub fn main() {
     match std::fs::read_to_string("day12.input") {
         Ok(input) => {
-            println!("num_arrangements = {}", num_arrangements(&input));
-            let num_arrangements_part2: usize = input.split('\n').filter_map(|i| {
-                if let Some((p, g)) = i.split_once(' ') {
-                    format!("{} {}", 
-                        repeat_element(std::iter::once(p), 5).collect::<Vec<_>>().join("?"),
-                        repeat_element(std::iter::once(g), 5).collect::<Vec<_>>().join(","), 
-                    ).parse::<ConditionRecord>().ok()
-                } else {
-                    None
-                }
-            }).map(|cr| cr.num_arrangements()).sum();
-            println!("num_arrangements (part 2) = {}", num_arrangements_part2);
+            println!("num_arrangements = {}", num_arrangements(&input, 1));
+            println!("num_arrangements (part 2) = {}", num_arrangements(&input, 5));
         },
         Err(reason) => println!("error = {}", reason)
     }
@@ -311,23 +364,64 @@ mod tests {
     }
 
     #[test]
-    fn example1_small() {
-        assert_eq!("?###???????? 3,2,1".parse::<ConditionRecord>().unwrap().num_arrangements(), 10);
+    fn example1_small_1() {
+        let dsg = &[3, 2, 1];
+        let mut s = build_state(".###.##....#", dsg).unwrap();
+        assert_eq!(s.last_damaged_count, 1);
+        assert_eq!(s.last_damaged_spring_groups_index, 2);
+        let valid_at_full = s.check_constraints(dsg, false);
+        assert!(valid_at_full);
+    }
+
+    #[test]
+    fn example1_small_2() {
+        let dsg = &[1, 1, 3];
+        let mut s = build_state(".#...#....###.", dsg).unwrap();
+        assert_eq!(s.last_damaged_count, 0);
+        assert_eq!(s.last_damaged_spring_groups_index, 3);
+        let valid_at_full = s.check_constraints(dsg, false);
+        assert!(valid_at_full);
     }
     
     #[test]
-    fn example1() {
+    fn example1_part1() {
         assert_eq!("???.### 1,1,3".parse::<ConditionRecord>().unwrap().num_arrangements(), 1);
         assert_eq!(".??..??...?##. 1,1,3".parse::<ConditionRecord>().unwrap().num_arrangements(), 4);
         assert_eq!("?#?#?#?#?#?#?#? 1,3,1,6".parse::<ConditionRecord>().unwrap().num_arrangements(), 1);
         assert_eq!("????.#...#... 4,1,1".parse::<ConditionRecord>().unwrap().num_arrangements(), 1);
         assert_eq!("????.######..#####. 1,6,5".parse::<ConditionRecord>().unwrap().num_arrangements(), 4);
+        assert_eq!("?###???????? 3,2,1".parse::<ConditionRecord>().unwrap().num_arrangements(), 10);
 
-        assert_eq!(num_arrangements(DATA), 21)
+        assert_eq!(num_arrangements(DATA, 1), 21)
     }
 
     #[test]
     fn part1_tests() {
         assert_eq!("???.#??#.??? 1,1,2,1".parse::<ConditionRecord>().unwrap().num_arrangements(), 10);
+    }
+
+    #[test]
+    fn condition_record_repeat() {
+        let cr = ".# 1".parse::<ConditionRecord>().unwrap().repeat(2);
+        assert_eq!(cr.conditions, vec![
+            Condition::Operational,
+            Condition::Damaged,
+            Condition::Unknown,
+            Condition::Operational,
+            Condition::Damaged,
+        ]);
+        assert_eq!(cr.damaged_spring_groups, vec![1,1]);
+    }
+
+    #[test]
+    fn example1_part2() {
+        assert_eq!("???.### 1,1,3".parse::<ConditionRecord>().unwrap().repeat(5).num_arrangements(), 1);
+        assert_eq!(".??..??...?##. 1,1,3".parse::<ConditionRecord>().unwrap().repeat(5).num_arrangements(), 16384);
+        assert_eq!("?#?#?#?#?#?#?#? 1,3,1,6".parse::<ConditionRecord>().unwrap().repeat(5).num_arrangements(), 1);
+        assert_eq!("????.#...#... 4,1,1".parse::<ConditionRecord>().unwrap().repeat(5).num_arrangements(), 16);
+        assert_eq!("????.######..#####. 1,6,5".parse::<ConditionRecord>().unwrap().repeat(5).num_arrangements(), 2500);
+        assert_eq!("?###???????? 3,2,1".parse::<ConditionRecord>().unwrap().repeat(5).num_arrangements(), 506250);
+
+        assert_eq!(num_arrangements(DATA, 5), 525152)
     }
 }
