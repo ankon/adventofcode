@@ -65,21 +65,21 @@ impl State {
     // configuration.
     // If `partial` is true then the check accepts conditions that are incomplete and could be completed
     // to a full valid configuration, if it is false then the conditions must match perfectly.
-    fn check_constraints(&mut self, damaged_spring_groups: &[usize], partial: bool) -> bool {
+    fn check_constraints(&mut self, damaged_spring_groups: &[usize], partial: bool, print: bool) -> bool {
         // Invalid states stay invalid, and we can skip partial checks when nothing has changed
         // since the last check.
         if self.invalid || (partial && self.unchecked_conditions.is_empty()) {
-            // if cfg!(test) {
-            //     println!("check_constraints({}): early exit", self);
-            // }
+            if print {
+                println!("check_constraints({}): early exit", self);
+            }
             return !self.invalid;
         }
 
         // Process all unchecked conditions
         for c in self.unchecked_conditions.iter() {
-            // if cfg!(test) {
-            //     print!("check_constraints(): applying {}", c);
-            // }
+            if print {
+                print!("check_constraints(): applying {}", c);
+            }
             match c {
                 Condition::Operational => {
                     // An operational condition was added, so any incomplete damaged group would now be complete and must match exactly
@@ -102,12 +102,7 @@ impl State {
                     // A damaged condition was added, so we need to check whether that is still fitting the current index.
                     self.last_damaged_count += 1;
                     if let Some(expected_damaged_count) = damaged_spring_groups.get(self.last_damaged_spring_groups_index) {
-                        let result = if partial {
-                            *expected_damaged_count >= self.last_damaged_count
-                        } else {
-                            *expected_damaged_count == self.last_damaged_count
-                        };
-                        self.invalid = !result;
+                        self.invalid = *expected_damaged_count < self.last_damaged_count;
                     } else {
                         // State is invalid: keep the constraint check flag on for now, so that the next one
                         // will also flag it.
@@ -120,14 +115,14 @@ impl State {
             };
             self.conditions.push(*c);
             if self.invalid {
-                // if cfg!(test) {
-                //     println!(": invalid, breaking");
-                // }
+                if print {
+                    println!(": invalid, breaking");
+                }
                 break;
             } else {
-                // if cfg!(test) {
-                //     println!()
-                // }
+                if print {
+                    println!()
+                }
             }
         }
         // Mark check as done, and return whether we're now invalid or not.
@@ -137,11 +132,18 @@ impl State {
         // if the last condition was damaged, or to after the end so that there are no missing groups.
         // println!("... invalid after applying unchecked = {}", self.invalid);
         if !self.invalid && !partial {
-            // print!("... not partial, checking group index {}", self.last_damaged_spring_groups_index);
+            if print {
+                print!("... not partial, checking group index {}", self.last_damaged_spring_groups_index);
+            }
             match self.conditions.last() {
                 Some(Condition::Damaged) => {
-                    // Invalid if not exactly pointing to the last.
-                    self.invalid = self.last_damaged_spring_groups_index != damaged_spring_groups.len() - 1;
+                    // Invalid
+                    // - if last damage count was not exactly the last group, or
+                    // - if not exactly pointing to the last.
+                    if let Some(expected_damaged_count) = damaged_spring_groups.get(self.last_damaged_spring_groups_index) {
+                        self.invalid = *expected_damaged_count != self.last_damaged_count;
+                    }
+                    self.invalid |= self.last_damaged_spring_groups_index != damaged_spring_groups.len() - 1;
                 },
                 _ => {
                     // Empty or last one was operational, invalid if not after the end
@@ -180,11 +182,15 @@ impl ConditionRecord {
         }
         ConditionRecord {
             conditions: new_conditions,
-            damaged_spring_groups: self.damaged_spring_groups.repeat(n,)
+            damaged_spring_groups: self.damaged_spring_groups.repeat(n),
         }
     }
 
     pub fn num_arrangements(&self) -> usize {
+        self.arrangements().len()
+    }
+
+    fn arrangements(&self) -> Vec<String> {
         // Stupid logic: Each '?' can be either '.' or '#'. So, try both, and then proceed
         // and see if _at the end_. Essentially we're building a matching automaton here?????!?!?!!
         // Each state is the conditions we found.
@@ -204,14 +210,14 @@ impl ConditionRecord {
                         // }
                         let mut tmp = vec![];
                         let mut s1 = s.and(Condition::Damaged);
-                        if s1.check_constraints(&self.damaged_spring_groups, true) {
+                        if s1.check_constraints(&self.damaged_spring_groups, true, false) {
                             // if cfg!(test) {
                             //     print!(", s1 = {} is valid", s1);
                             // }
                             tmp.push(s1);
                         }
                         let mut s2 = s.and(Condition::Operational);
-                        if s2.check_constraints(&self.damaged_spring_groups, true) {
+                        if s2.check_constraints(&self.damaged_spring_groups, true, false) {
                             // if cfg!(test) {
                             //     print!(", s2 = {} is valid", s2);
                             // }
@@ -224,7 +230,7 @@ impl ConditionRecord {
                         //     print!(": definite");
                         // }
                         let mut s1 = s.and(*c);
-                        if s1.check_constraints(&self.damaged_spring_groups, true) {
+                        if s1.check_constraints(&self.damaged_spring_groups, true, false) {
                             // if cfg!(test) {
                             //     print!(", s1 = {} is valid", s1);
                             // }
@@ -241,22 +247,22 @@ impl ConditionRecord {
             }).collect();
             // println!(" ... next_states = {}", next_states.iter().map(|s| self.format_state(s)).collect::<Vec<_>>().join(","));
             if next_states.is_empty() {
-                println!("no more states, can return 0 early");
-                return 0;
+                println!("no more states, can return empty early");
+                return vec![];
             }
             *states = next_states;
         }
 
-        let mut result = 0;
+        // Filter out the invalid states
+        let mut result = vec![];
         for s in states.iter_mut() {
-            let valid = s.check_constraints(&self.damaged_spring_groups, false);
+            let valid = s.check_constraints(&self.damaged_spring_groups, false, false);
             if valid {
                 // println!("state = {}: counted, valid at full", s);
-                result += 1;
+                let cond_str = std::str::from_utf8(&s.conditions.iter().map(|c| *c as u8).collect::<Vec<u8>>()).unwrap().to_string();
+                result.push(cond_str);
             } else {
-                // if cfg!(test) {
-                //     println!("state = {}: pruned, invalid at full", s);
-                // }
+                // println!("state = {}: pruned, invalid at full", s);
             }
         }
         result
@@ -265,6 +271,121 @@ impl ConditionRecord {
     fn parse_state(s: &str) -> Vec<Condition> {
         s.chars().map(Condition::from).collect()
     }
+
+    // OLD
+    #[cfg(test)]
+    pub fn num_arrangements_old(&self) -> usize {
+        // Stupid logic: Each '?' can be either '.' or '#'. So, try both, and then proceed
+        // and see if _at the end_. Essentially we're building a matching automaton here?????!?!?!!
+        // Each state is the conditions we found.
+        let states: &mut Vec<Vec<Condition>> = &mut vec![];
+
+        // Start out with one empty state:
+        let initial_state = vec![];
+        states.push(initial_state);
+        for c in &self.conditions {
+            // println!("{:?} with states {}", c, states.iter().map(|s| Self::format_state(s)).collect::<Vec<_>>().join(","));
+
+            // Modify the states depending on the condition
+            // If we see a '.' or '#' then it will be added immediately to the states, which may
+            // make some switch from "could work" to "invalid".
+            // If we see a '?' we fork the state, and keep the the valid parts.
+            let next_states: Vec<_> = states.iter().flat_map(|s| {
+                // println!(" ... looking at {}{}", Self::format_state(s), *c as u8 as char);
+                match c {
+                    Condition::Unknown => {
+                        let mut tmp = vec![];
+                        let mut s1 = s.clone();
+                        s1.push(Condition::Damaged);
+                        if self.violates_constraints(&s1, true) {
+                            // println!(" ... {:?} violates constraints", Self::format_state(&s1));
+                        } else {
+                            // println!(" ... {:?} is acceptable", Self::format_state(&s1));
+                            tmp.push(s1);
+                        }
+
+                        let mut s2 = s.clone();
+                        s2.push(Condition::Operational);
+                        if self.violates_constraints(&s2, true) {
+                            // println!(" ... {:?} violates constraints", Self::format_state(&s2));
+                        } else {
+                            // println!(" ... {:?} is acceptable", Self::format_state(&s2));
+                            tmp.push(s2);
+                        }
+                        tmp
+                    },
+                    _ => {
+                        let mut s1 = s.clone();
+                        s1.push(*c);
+                        if self.violates_constraints(&s1, true) {
+                            // println!(" ... {:?} violates constraints", Self::format_state(&s1));
+                            vec![]
+                        } else {
+                            vec![s1]
+                        }
+                    }
+                }
+            }).collect();
+            // println!(" ... next_states = {}", next_states.iter().map(|s| self.format_state(s)).collect::<Vec<_>>().join(","));
+            if next_states.is_empty() {
+                println!("no more states, can return 0 early");
+                return 0;
+            }
+            *states = next_states;
+        }
+
+        states.iter().filter(|s| !self.violates_constraints(s, false)).count()
+    }
+
+    // Check whether the given conditions violates the constraints given by the `damaged_spring_groups`
+    // configuration.
+    // If `partial` is true then the check accepts conditions that are incomplete and could be completed
+    // to a full valid configuration, if it is false then the conditions must match perfectly.
+    #[cfg(test)]
+    fn violates_constraints(&self, conditions: &[Condition], partial: bool) -> bool {
+        let mut next_spring_group = self.damaged_spring_groups.iter();
+        let mut damaged_count = 0;
+        for c in conditions {
+            if *c == Condition::Operational {
+                if damaged_count > 0 {
+                    match next_spring_group.next() {
+                        Some(expected_damaged_count) => {
+                            if *expected_damaged_count != damaged_count {
+                                return true;
+                            }
+                        },
+                        None => {
+                            return true;
+                        },
+                    }
+                    damaged_count = 0;
+                }
+            } else if *c == Condition::Damaged {
+                damaged_count += 1;
+            } else {
+                panic!("unexpected condition {:?}", c)
+            }
+        }
+
+        // We're only checking whether the given conditions could still pass, so at this point
+        // we only want "close enough": If we collected some damaged springs, then the next value
+        // in the iteration must not be smaller than that.
+        // For a "full" check we would also verify that there is nothing left over at the end, and
+        // any collected damamged springs would have to match exactly.
+        match next_spring_group.next() {
+            Some(expected_damaged_count) => {
+                if partial {
+                    damaged_count > *expected_damaged_count
+                } else {
+                    damaged_count != *expected_damaged_count || next_spring_group.next().is_some()
+                }
+            }
+            None => {
+                damaged_count > 0
+            }
+        }
+    }
+    // END: OLD
 }
 
 impl std::str::FromStr for ConditionRecord {
@@ -338,7 +459,7 @@ mod tests {
         for c in s.chars() {
             let cond = Condition::from(c);
             result = result.and(cond);
-            if !result.check_constraints(damaged_spring_groups, true) {
+            if !result.check_constraints(damaged_spring_groups, true, false) {
                 return Err("cannot build state");
             }
         }
@@ -347,14 +468,14 @@ mod tests {
 
     #[test]
     fn state_check_constraints_partial() {
-        assert!(State::empty().check_constraints(&[], true), "empty allows empty");
+        assert!(State::empty().check_constraints(&[], true, false), "empty allows empty");
         let dsg1 = &[1];
-        assert!(State::empty().check_constraints(dsg1, true), "non-empty allows empty");
-        assert!(build_state("#", dsg1).unwrap().check_constraints(dsg1, true), "must match single");
+        assert!(State::empty().check_constraints(dsg1, true, false), "non-empty allows empty");
+        assert!(build_state("#", dsg1).unwrap().check_constraints(dsg1, true, false), "must match single");
         let dsg21 = &[2, 1];
-        assert!(build_state("##.#", dsg21).unwrap().check_constraints(dsg21, true), "must match multiple with operational in the middle");
+        assert!(build_state("##.#", dsg21).unwrap().check_constraints(dsg21, true, false), "must match multiple with operational in the middle");
         let dsg22 = &[2, 2];
-        assert!(build_state("##.#", dsg22).unwrap().check_constraints(dsg22, true), "last can be incomplete");
+        assert!(build_state("##.#", dsg22).unwrap().check_constraints(dsg22, true, false), "last can be incomplete");
     }
 
     #[test]
@@ -369,7 +490,7 @@ mod tests {
         let mut s = build_state(".###.##....#", dsg).unwrap();
         assert_eq!(s.last_damaged_count, 1);
         assert_eq!(s.last_damaged_spring_groups_index, 2);
-        let valid_at_full = s.check_constraints(dsg, false);
+        let valid_at_full = s.check_constraints(dsg, false, false);
         assert!(valid_at_full);
     }
 
@@ -379,10 +500,10 @@ mod tests {
         let mut s = build_state(".#...#....###.", dsg).unwrap();
         assert_eq!(s.last_damaged_count, 0);
         assert_eq!(s.last_damaged_spring_groups_index, 3);
-        let valid_at_full = s.check_constraints(dsg, false);
+        let valid_at_full = s.check_constraints(dsg, false, false);
         assert!(valid_at_full);
     }
-    
+
     #[test]
     fn example1_part1() {
         assert_eq!("???.### 1,1,3".parse::<ConditionRecord>().unwrap().num_arrangements(), 1);
@@ -397,7 +518,12 @@ mod tests {
 
     #[test]
     fn part1_tests() {
-        assert_eq!("???.#??#.??? 1,1,2,1".parse::<ConditionRecord>().unwrap().num_arrangements(), 10);
+        //assert_eq!("???.#??#.??? 1,1,2,1".parse::<ConditionRecord>().unwrap().num_arrangements(), 10);
+        let cr = "##???#??#?????????#? 11,6".parse::<ConditionRecord>().unwrap();
+        assert_eq!(cr.arrangements(), &[
+            "###########..######.",
+            "###########...######",
+        ]);
     }
 
     #[test]
@@ -423,5 +549,20 @@ mod tests {
         assert_eq!("?###???????? 3,2,1".parse::<ConditionRecord>().unwrap().repeat(5).num_arrangements(), 506250);
 
         assert_eq!(num_arrangements(DATA, 5), 525152)
+    }
+
+    #[test]
+    fn old_vs_new() {
+        match std::fs::read_to_string("day12.input") {
+            Ok(input) => {
+                for line in input.split('\n') {
+                    let cr = line.parse::<ConditionRecord>().unwrap();
+                    let old = cr.num_arrangements_old();
+                    let new = cr.num_arrangements();
+                    assert_eq!(new, old, "old = {}, new = {}", old, new);
+                }
+            },
+            Err(reason) => println!("error = {}", reason)
+        }
     }
 }
