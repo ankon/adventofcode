@@ -272,7 +272,7 @@ impl ConditionRecord {
                     }
                 }
 
-                if true || print {
+                if print {
                     println!("{}/{}: |states after repeat| = {:?}, dropped = {}", r, repeat, states.len(), next_states.len() - states.len());
                 }
             }
@@ -411,7 +411,7 @@ impl std::str::FromStr for ConditionRecord {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         if let Some((p, g)) = s.split_once(' ') {
-            println!("from_str: p='{}', g='{}'", p, g);
+            // println!("from_str: p='{}', g='{}'", p, g);
             if let Ok(damaged_spring_groups) = g.split(',').map(usize::from_str).collect::<Result<Vec<usize>, _>>() {
                 Ok(ConditionRecord {
                     conditions: ConditionRecord::parse_state(p),
@@ -428,13 +428,47 @@ impl std::str::FromStr for ConditionRecord {
 }
 
 fn num_arrangements(input: &str, repeat: usize) -> usize {
-    input.split('\n').map(str::parse::<ConditionRecord>).map(|cr| cr.unwrap().repeat(repeat).num_arrangements()).sum()
+    let thread_count_arc = std::sync::Arc::new((std::sync::Mutex::new(0u8), std::sync::Condvar::new()));
+
+    let mut v = vec![];
+    for (id, line) in input.split('\n').enumerate() {
+        if let Ok(cr) = line.parse::<ConditionRecord>() {
+            let thread_count = thread_count_arc.clone();
+            let jh = std::thread::spawn(move || {
+                let (num, cvar) = &*thread_count;
+
+                let mut start = cvar
+                    .wait_while(num.lock().unwrap(), |start| *start >= 32)
+                    .unwrap();
+                *start += 1;
+                drop(start);
+
+                println!("thread {} for \"{}\" running", id, cr.conditions.iter().map(|c| *c as u8 as char).collect::<String>());
+                let result = cr.repeat(repeat).num_arrangements();
+                println!("thread {} for \"{}\" finished: {} arrangements", id, cr.conditions.iter().map(|c| *c as u8 as char).collect::<String>(), result);
+
+                start = num.lock().unwrap();
+                *start -= 1;
+                cvar.notify_one();
+
+                result
+            });
+            v.push(jh);
+        }
+    }
+
+    let expected = v.len();
+    v.drain(..).enumerate().map(|(i, jh)| {
+        let result = jh.join().unwrap();
+        println!("joined {}, {} total", i, expected);
+        result
+    }).sum()
 }
 
 pub fn main() {
     match std::fs::read_to_string("day12.input") {
         Ok(input) => {
-            println!("num_arrangements = {}", num_arrangements(&input, 1));
+            // println!("num_arrangements = {}", num_arrangements(&input, 1));
             println!("num_arrangements (part 2) = {}", num_arrangements(&input, 5));
         },
         Err(reason) => println!("error = {}", reason)
