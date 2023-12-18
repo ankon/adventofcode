@@ -175,41 +175,34 @@ impl Display for State {
 struct ConditionRecord {
     conditions: Vec<Condition>,
     damaged_spring_groups: Vec<usize>,
+    repeat: usize,
 }
 
 impl ConditionRecord {
     pub fn repeat(&self, n: usize) -> ConditionRecord {
-        let mut new_conditions = vec![];
-        for i in 0..n {
-            for c in &self.conditions {
-                new_conditions.push(*c);
-            }
-            if i != n-1 {
-                new_conditions.push(Condition::Unknown);
-            }
-        }
         ConditionRecord {
-            conditions: new_conditions,
-            damaged_spring_groups: self.damaged_spring_groups.repeat(n),
+            conditions: self.conditions.clone(),
+            damaged_spring_groups: self.damaged_spring_groups.clone(),
+            repeat: self.repeat * n,
         }
     }
 
     pub fn num_arrangements(&self) -> usize {
-        self.arrangements(false).len()
+        Self::arrangements(&self.conditions, &self.damaged_spring_groups, self.repeat, false).len()
     }
 
-    fn process_state(&self, s: State, c: Condition, print: bool) -> Vec<State> {
+    fn process_state(damaged_spring_groups: &[usize], s: State, c: Condition, print: bool) -> Vec<State> {
         let mut result = vec![];
         match c {
             Condition::Unknown => {
                 let mut s1 = s.and(Condition::Damaged);
-                if s1.check_constraints(&self.damaged_spring_groups, true, false) {
+                if s1.check_constraints(damaged_spring_groups, true, false) {
                     result.push(s1);
                 } else if print {
                     println!("... {} dropped", s1);
                 }
                 let mut s2 = s.and(Condition::Operational);
-                if s2.check_constraints(&self.damaged_spring_groups, true, false) {
+                if s2.check_constraints(damaged_spring_groups, true, false) {
                     result.push(s2);
                 } else if print {
                     println!("... {} dropped", s2);
@@ -217,7 +210,7 @@ impl ConditionRecord {
             },
             c => {
                 let mut s1 = s.and(c);
-                if s1.check_constraints(&self.damaged_spring_groups, true, false) {
+                if s1.check_constraints(damaged_spring_groups, true, false) {
                     result.push(s1);
                 } else if print {
                     println!("... {} dropped", s1);
@@ -227,33 +220,55 @@ impl ConditionRecord {
         result
     }
 
-    fn arrangements(&self, print: bool) -> Vec<String> {
+    fn arrangements(conditions: &[Condition], damaged_spring_groups: &[usize], repeat: usize, print: bool) -> Vec<String> {
         // Stupid logic: Each '?' can be either '.' or '#'. So, try both, and then proceed
         // and see if _at the end_. Essentially we're building a matching automaton here?????!?!?!!
         // Each state is the conditions we found.
         let states: &mut Vec<State> = &mut vec![];
+        let repeated_damaged_spring_groups = damaged_spring_groups.repeat(repeat);
 
         // Start out with one empty state:
         states.push(State::empty());
-        for (i, c) in self.conditions.iter().enumerate() {
-            let next_states = &states
-                .drain(..)
-                .flat_map(|s| self.process_state(s, *c, print))
-                .collect::<Vec<_>>();
-            if next_states.is_empty() {
-                println!("no more states, can return empty early");
-                return vec![];
+        for r in 0..repeat {
+            for (i, c) in conditions.iter().enumerate() {
+                let next_states = &states
+                    .drain(..)
+                    .flat_map(|s| Self::process_state(&repeated_damaged_spring_groups, s, *c, print))
+                    .collect::<Vec<_>>();
+                if next_states.is_empty() {
+                    println!("no more states, can return empty early");
+                    return vec![];
+                }
+                *states = next_states.to_vec();
+                if print {
+                    println!("{}/{}: {}/{} |states| = {:?}", r, repeat, i, conditions.len(), states.len());
+                }
             }
-            *states = next_states.to_vec();
-            if print {
-                println!("{}/{} |states| = {:?}", i, self.conditions.len(), states.len());
+
+            // Repeating adds a unknown condition, so process that.
+            if r != repeat-1 {
+                if print {
+                    println!("{}/{}: processing implicit unknown condition", r, repeat);
+                }
+                let next_states = &states
+                    .drain(..)
+                    .flat_map(|s| Self::process_state(&repeated_damaged_spring_groups, s, Condition::Unknown, print))
+                    .collect::<Vec<_>>();
+                if next_states.is_empty() {
+                    println!("no more states, can return empty early");
+                    return vec![];
+                }
+                *states = next_states.to_vec();
+                if print {
+                    println!("{}/{}: |states after repeat| = {:?}", r, repeat, states.len());
+                }
             }
         }
 
         // Filter out the invalid states
         let mut result = vec![];
         for s in states.iter_mut() {
-            let valid = s.check_constraints(&self.damaged_spring_groups, false, false);
+            let valid = s.check_constraints(&repeated_damaged_spring_groups, false, false);
             if valid {
                 // println!("state = {}: counted, valid at full", s);
                 let cond_str = std::str::from_utf8(&s.conditions.iter().map(|c| *c as u8).collect::<Vec<u8>>()).unwrap().to_string();
@@ -388,6 +403,7 @@ impl std::str::FromStr for ConditionRecord {
                 Ok(ConditionRecord {
                     conditions: ConditionRecord::parse_state(p),
                     damaged_spring_groups,
+                    repeat: 1,
                 })
             } else {
                 Err("cannot parse damaged spring groups")
@@ -510,7 +526,7 @@ mod tests {
     fn part1_tests() {
         //assert_eq!("???.#??#.??? 1,1,2,1".parse::<ConditionRecord>().unwrap().num_arrangements(), 10);
         let cr = "##???#??#?????????#? 11,6".parse::<ConditionRecord>().unwrap();
-        assert_eq!(cr.arrangements(false), &[
+        assert_eq!(ConditionRecord::arrangements(&cr.conditions, &cr.damaged_spring_groups, 1, false), &[
             "###########..######.",
             "###########...######",
         ]);
@@ -519,14 +535,7 @@ mod tests {
     #[test]
     fn condition_record_repeat() {
         let cr = ".# 1".parse::<ConditionRecord>().unwrap().repeat(2);
-        assert_eq!(cr.conditions, vec![
-            Condition::Operational,
-            Condition::Damaged,
-            Condition::Unknown,
-            Condition::Operational,
-            Condition::Damaged,
-        ]);
-        assert_eq!(cr.damaged_spring_groups, vec![1,1]);
+        assert_eq!(cr.repeat, 2);
     }
 
     #[test]
@@ -539,6 +548,23 @@ mod tests {
         assert_eq!("?###???????? 3,2,1".parse::<ConditionRecord>().unwrap().repeat(5).num_arrangements(), 506250);
 
         assert_eq!(num_arrangements(DATA, 5), 525152)
+    }
+
+    #[test]
+    fn part2_tests_known() {
+        let cr = "???.### 1,1,3".parse::<ConditionRecord>().unwrap();
+        for line in ConditionRecord::arrangements(&cr.conditions, &cr.damaged_spring_groups, 5, true) {
+            println!("{}", line);
+        }
+    }
+
+    #[test]
+    fn part2_tests_dump() {
+        // let cr = "???.#??#.??? 1,1,2,1".parse::<ConditionRecord>().unwrap();
+        let cr = "????.######..#####. 1,6,5".parse::<ConditionRecord>().unwrap();
+        for line in ConditionRecord::arrangements(&cr.conditions, &cr.damaged_spring_groups, 2, true) {
+            println!("{}", line);
+        }
     }
 
     #[test]
