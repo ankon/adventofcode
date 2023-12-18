@@ -258,9 +258,22 @@ impl ConditionRecord {
                     println!("no more states, can return empty early");
                     return vec![];
                 }
-                *states = next_states.to_vec();
-                if print {
-                    println!("{}/{}: |states after repeat| = {:?}", r, repeat, states.len());
+
+                // Prune everything that doesn't have at least a remote chance: We should have roughly
+                // the same number of groups in this section than existed in the original damaged_spring_groups.
+                states.clear();
+                for s in next_states {
+                    // XXX: This is probably the same or related-to as last_damaged_group_index.
+                    // XXX: The problem is that we may have situations where the added Unknown actually makes some group
+                    //      possible -- but I don't see yet how.
+                    let expected_num_groups = damaged_spring_groups.len() * (r + 1);
+                    if s.last_damaged_spring_groups_index >= expected_num_groups - 1 {
+                        states.push(s.clone());
+                    }
+                }
+
+                if true || print {
+                    println!("{}/{}: |states after repeat| = {:?}, dropped = {}", r, repeat, states.len(), next_states.len() - states.len());
                 }
             }
         }
