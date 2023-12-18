@@ -60,22 +60,11 @@ impl State {
         }
     }
 
-
-    // Check whether the given conditions violates the constraints given by the `damaged_spring_groups`
-    // configuration.
-    // If `partial` is true then the check accepts conditions that are incomplete and could be completed
-    // to a full valid configuration, if it is false then the conditions must match perfectly.
-    fn check_constraints(&mut self, damaged_spring_groups: &[usize], partial: bool, print: bool) -> bool {
-        // Invalid states stay invalid, and we can skip partial checks when nothing has changed
-        // since the last check.
-        if self.invalid || (partial && self.unchecked_conditions.is_empty()) {
-            if print {
-                println!("check_constraints({}): early exit", self);
-            }
-            return !self.invalid;
+    fn apply_unchecked_conditions(&mut self, damaged_spring_groups: &[usize], print: bool) {
+        if self.unchecked_conditions.is_empty() {
+            return
         }
 
-        // Process all unchecked conditions
         for c in self.unchecked_conditions.iter() {
             if print {
                 print!("check_constraints(): applying {}", c);
@@ -127,6 +116,24 @@ impl State {
         }
         // Mark check as done, and return whether we're now invalid or not.
         self.unchecked_conditions.clear();
+    }
+
+    // Check whether the given conditions violates the constraints given by the `damaged_spring_groups`
+    // configuration.
+    // If `partial` is true then the check accepts conditions that are incomplete and could be completed
+    // to a full valid configuration, if it is false then the conditions must match perfectly.
+    fn check_constraints(&mut self, damaged_spring_groups: &[usize], partial: bool, print: bool) -> bool {
+        // Invalid states stay invalid, and we can skip partial checks when nothing has changed
+        // since the last check.
+        if self.invalid || (partial && self.unchecked_conditions.is_empty()) {
+            if print {
+                println!("check_constraints({}): early exit", self);
+            }
+            return !self.invalid;
+        }
+
+        // Process all unchecked conditions
+        self.apply_unchecked_conditions(damaged_spring_groups, print);
 
         // If we're not doing a partial check, then the group index should point to the last group
         // if the last condition was damaged, or to after the end so that there are no missing groups.
