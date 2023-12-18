@@ -31,7 +31,7 @@ impl Display for Condition {
 // State when searching for arrangements
 struct State {
     conditions: Vec<Condition>,
-    unchecked_conditions: Vec<Condition>,
+    unchecked_condition: Option<Condition>,
     last_damaged_count: usize,
     last_damaged_spring_groups_index: usize,
     invalid: bool,
@@ -41,7 +41,7 @@ impl State {
     fn empty() -> State {
         State {
             conditions: vec![],
-            unchecked_conditions: vec![],
+            unchecked_condition: None,
             last_damaged_count: 0,
             last_damaged_spring_groups_index: 0,
             invalid: false,
@@ -51,9 +51,12 @@ impl State {
         if self.invalid {
             panic!("cannot 'and' to an invalid state");
         }
+        if self.unchecked_condition.is_some() {
+            panic!("cannot 'and' to a state with unchecked conditions");
+        }
         State {
             conditions: self.conditions.clone(),
-            unchecked_conditions: vec![c],
+            unchecked_condition: Some(c),
             last_damaged_count: self.last_damaged_count,
             last_damaged_spring_groups_index: self.last_damaged_spring_groups_index,
             invalid: false,
@@ -61,11 +64,7 @@ impl State {
     }
 
     fn apply_unchecked_conditions(&mut self, damaged_spring_groups: &[usize], print: bool) {
-        if self.unchecked_conditions.is_empty() {
-            return
-        }
-
-        for c in self.unchecked_conditions.iter() {
+        if let Some(c) = self.unchecked_condition {
             if print {
                 print!("check_constraints(): applying {}", c);
             }
@@ -102,20 +101,14 @@ impl State {
                     panic!("unexpected condition {}", condition);
                 },
             };
-            self.conditions.push(*c);
-            if self.invalid {
-                if print {
-                    println!(": invalid, breaking");
-                }
-                break;
-            } else {
-                if print {
-                    println!()
-                }
+
+            // Consume the unchecked condition
+            self.unchecked_condition = None;
+            self.conditions.push(c);
+            if print {
+                println!(": invalid = {}", self.invalid);
             }
         }
-        // Mark check as done, and return whether we're now invalid or not.
-        self.unchecked_conditions.clear();
     }
 
     // Check whether the given conditions violates the constraints given by the `damaged_spring_groups`
@@ -125,7 +118,7 @@ impl State {
     fn check_constraints(&mut self, damaged_spring_groups: &[usize], partial: bool, print: bool) -> bool {
         // Invalid states stay invalid, and we can skip partial checks when nothing has changed
         // since the last check.
-        if self.invalid || (partial && self.unchecked_conditions.is_empty()) {
+        if self.invalid || (partial && self.unchecked_condition.is_none()) {
             if print {
                 println!("check_constraints({}): early exit", self);
             }
@@ -166,8 +159,15 @@ impl State {
 impl Display for State {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let cond_str = std::str::from_utf8(&self.conditions.iter().map(|c| *c as u8).collect::<Vec<u8>>()).unwrap().to_string();
-        let unchecked_cond_str = std::str::from_utf8(&self.unchecked_conditions.iter().map(|c| *c as u8).collect::<Vec<u8>>()).unwrap().to_string();
-        write!(f, "\"{}\" (ldc = {}, i = {}, invalid = {}, unchecked = {:?})", cond_str, self.last_damaged_count, self.last_damaged_spring_groups_index, self.invalid, unchecked_cond_str)
+        let r = write!(f, "\"{}\" (ldc = {}, i = {}, invalid = {}", cond_str, self.last_damaged_count, self.last_damaged_spring_groups_index, self.invalid);
+        if r.is_err() {
+            panic!("cannot format state");
+        }
+        if let Some(unchecked_condition) = self.unchecked_condition {
+            write!(f, ", unchecked = {})", unchecked_condition)
+        } else {
+            write!(f, ")")
+        }
     }
 }
 
@@ -378,7 +378,7 @@ impl ConditionRecord {
         // we only want "close enough": If we collected some damaged springs, then the next value
         // in the iteration must not be smaller than that.
         // For a "full" check we would also verify that there is nothing left over at the end, and
-        // any collected damamged springs would have to match exactly.
+        // any collected damaged springs would have to match exactly.
         match next_spring_group.next() {
             Some(expected_damaged_count) => {
                 if partial {
