@@ -15,7 +15,7 @@ struct Pattern {
 }
 
 impl Pattern {
-    fn find_mirror_column(&self, max_errors: u32, print: bool) -> impl Iterator<Item = usize> {
+    fn find_mirror_column(&self, errors: u32, print: bool) -> impl Iterator<Item = usize> {
         let mut result = vec![];
         let mut last = None;
         for (i, c) in self.columns.iter().enumerate() {
@@ -25,7 +25,7 @@ impl Pattern {
             if let Some(l) = last {
                 // Calculate the number of errors between this and the previous row. If we still have some
                 // left from our budget, proceed checking further.
-                let mut errors_left  = (max_errors as i32) - (((l as u32) ^ *c).count_ones() as i32);
+                let mut errors_left  = (errors as i32) - (((l as u32) ^ *c).count_ones() as i32);
                 if errors_left >= 0 {
                     if print {
                         println!("find_mirror_column: found potential mirror line at i = {}", i);
@@ -57,7 +57,7 @@ impl Pattern {
                         // Proceed with the next pair.
                     }
 
-                    if found {
+                    if found && errors_left == 0 {
                         result.push(i);
                     }
                 }
@@ -68,7 +68,7 @@ impl Pattern {
         result.into_iter()
     }
 
-    fn find_mirror_row(&self, max_errors: u32, print: bool) -> impl Iterator<Item = usize> {
+    fn find_mirror_row(&self, errors: u32, print: bool) -> impl Iterator<Item = usize> {
         let mut result = vec![];
         let mut last = None;
         for (i, c) in self.rows.iter().enumerate() {
@@ -78,7 +78,7 @@ impl Pattern {
             if let Some(l) = last {
                 // Calculate the number of errors between this and the previous row. If we still have some
                 // left from our budget, proceed checking further.
-                let mut errors_left  = (max_errors as i32) - (((l as u32) ^ *c).count_ones() as i32);
+                let mut errors_left  = (errors as i32) - (((l as u32) ^ *c).count_ones() as i32);
                 if errors_left >= 0 {
                     // Found a potential mirror line
                     // Iterate outwards from here
@@ -110,7 +110,7 @@ impl Pattern {
                         // Proceed with the next pair.
                     }
 
-                    if found {
+                    if found && errors_left == 0 {
                         result.push(i);
                     }
                 }
@@ -243,7 +243,7 @@ fn print_pattern_and_mirror_indicators(pattern: &Pattern, column: Option<usize>,
 
 pub fn main() {
     // Part 1: 0, Part 2: 1.
-    static MAX_ERRORS: u32 = 1;
+    static ERRORS: u32 = 1;
 
     match std::fs::read_to_string("day13.input") {
         Ok(mut input) => {
@@ -259,7 +259,7 @@ pub fn main() {
                     }
                     let pattern = tmp.parse::<Pattern>().unwrap();
                     let mut num_mirror_lines = 0;
-                    for (c, r) in pattern.find_mirror(MAX_ERRORS, false) {
+                    for (c, r) in pattern.find_mirror(ERRORS, false) {
                         if num_mirror_lines == 0 {
                             print_pattern_and_mirror_indicators(&pattern, c, r);
                         }
@@ -285,7 +285,7 @@ pub fn main() {
                     tmp.push('\n');
                 }
             }
-            println!("summarized with MAX_ERRORS = {}: {}", MAX_ERRORS, result);
+            println!("summarized with {} errors: {}", ERRORS, result);
         }
         Err(reason) => println!("error = {}", reason),
     }
@@ -364,14 +364,14 @@ mod tests {
     #[test]
     fn example2_data1() {
         let pattern = DATA1.parse::<Pattern>().unwrap();
-        assert_eq!(pattern.find_mirror(1, true).collect::<Vec<_>>(), vec![(None, Some(3)), (Some(5), None)]);
+        assert_eq!(pattern.find_mirror(1, true).collect::<Vec<_>>(), vec![(None, Some(3))]);
         print_pattern_with_row_indicator(&pattern, 3)
     }
 
     #[test]
     fn example2_data2() {
         let pattern = DATA2.parse::<Pattern>().unwrap();
-        assert_eq!(pattern.find_mirror(1, true).collect::<Vec<_>>(), vec![(None, Some(1)), (None, Some(4))]);
+        assert_eq!(pattern.find_mirror(1, true).collect::<Vec<_>>(), vec![(None, Some(1))]);
         print_pattern_with_row_indicator(&pattern, 1)
     }
 }
