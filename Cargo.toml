@@ -8,6 +8,7 @@ edition = "2021"
 [dependencies]
 muldiv = "1.0.1"
 num = "0.4.1"
+rust-crypto = "0.2.36"
 
 [[bin]]
 name = "adventofcode"
