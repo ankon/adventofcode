@@ -120,8 +120,7 @@ impl Platform {
 
 impl std::fmt::Display for Platform {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        let rows = self.tiles.len();
-        for (r, row) in self.tiles.iter().enumerate() {
+        for (_, row) in self.tiles.iter().enumerate() {
             for tile in row {
                 write!(f, "{}", match tile {
                     Tile::Empty => '.',
@@ -129,7 +128,7 @@ impl std::fmt::Display for Platform {
                     Tile::RoundedRock => 'O',
                 })?;
             }
-            writeln!(f, " {:3}", rows - r)?;
+            writeln!(f)?
         }
         Ok(())
     }
@@ -197,7 +196,7 @@ mod test {
     use super::*;
 
     static CYCLES: usize = 1000000000;
-    static DATA: &str = "O....#....
+    static INITIAL: &str = "O....#....
 O.OO#....#
 .....##...
 OO.#O....O
@@ -208,9 +207,53 @@ O.#..O.#.#
 #....###..
 #OO..#....";
 
+    static AFTER_NORTH: &str = "OOOO.#.O..
+OO..#....#
+OO..O##..O
+O..#.OO...
+........#.
+..#....#.#
+..O..#.O.O
+..O.......
+#....###..
+#....#....";
+
+    static AFTER_CYCLE_1: &str = ".....#....
+....#...O#
+...OO##...
+.OO#......
+.....OOO#.
+.O#...O#.#
+....O#....
+......OOOO
+#...O###..
+#..OO#....";
+
+    static AFTER_CYCLE_2: &str = ".....#....
+....#...O#
+.....##...
+..O#......
+.....OOO#.
+.O#...O#.#
+....O#...O
+.......OOO
+#..OO###..
+#.OOO#...O";
+
+    static AFTER_CYCLE_3: &str = ".....#....
+....#...O#
+.....##...
+..O#......
+.....OOO#.
+.O#...O#.#
+....O#...O
+.......OOO
+#...O###.O
+#.OOO#...O";
+
     #[test]
     fn test_part1() {
-        let mut platform: Platform = DATA.parse().unwrap();
+        let mut platform: Platform = INITIAL.parse().unwrap();
         println!("initial\n{}", platform);
         platform.tilt(Direction::North);
         println!("after tilt\n{}", platform);
@@ -218,8 +261,26 @@ O.#..O.#.#
     }
 
     #[test]
+    fn test_tilt_north() {
+        let mut platform: Platform = INITIAL.parse().unwrap();
+        platform.tilt(Direction::North);
+        assert_eq!(platform.to_string().trim_end(), AFTER_NORTH);
+    }
+
+    #[test]
+    fn test_cycle() {
+        let mut platform: Platform = INITIAL.parse().unwrap();
+        platform.cycle();
+        assert_eq!(platform.to_string().trim_end(), AFTER_CYCLE_1);
+        platform.cycle();
+        assert_eq!(platform.to_string().trim_end(), AFTER_CYCLE_2);
+        platform.cycle();
+        assert_eq!(platform.to_string().trim_end(), AFTER_CYCLE_3);
+    }
+
+    #[test]
     fn test_part2() {
-        let mut platform: Platform = DATA.parse().unwrap();
+        let mut platform: Platform = INITIAL.parse().unwrap();
         println!("initial\n{}", platform);
 
         let mut previous_checksum = platform.checksum();
