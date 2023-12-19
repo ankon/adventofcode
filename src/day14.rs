@@ -218,6 +218,39 @@ O..#.OO...
 #....###..
 #....#....";
 
+    static AFTER_WEST: &str = "O....#....
+OOO.#....#
+.....##...
+OO.#OO....
+OO......#.
+O.#O...#.#
+O....#OO..
+O.........
+#....###..
+#OO..#....";
+
+    static AFTER_SOUTH: &str = "O....#....
+....#....#
+...O.##...
+...#......
+..O....O#O
+O.#..O.#.#
+O....#....
+OO....OO..
+#OO..###..
+#OO.O#...O";
+
+    static AFTER_EAST: &str = "....O#....
+.O.OO#....#
+.....##...
+.OO#....OO
+......OO#.
+.O#...O#.#
+....O#..OO
+.........O
+#....###..
+#..OO#....";
+
     static AFTER_CYCLE_1: &str = ".....#....
 ....#...O#
 ...OO##...
@@ -276,6 +309,29 @@ O..#.OO...
         assert_eq!(platform.to_string().trim_end(), AFTER_CYCLE_2);
         platform.cycle();
         assert_eq!(platform.to_string().trim_end(), AFTER_CYCLE_3);
+    }
+
+    #[test]
+    fn test_tilt_west() {
+        let mut platform: Platform = INITIAL.parse().unwrap();
+        platform.tilt(Direction::West);
+        assert_eq!(platform.to_string().trim_end(), AFTER_WEST);
+    }
+
+    #[test]
+    fn test_tilt_south() {
+        let mut platform: Platform = INITIAL.parse().unwrap();
+        platform.tilt(Direction::South);
+        assert_eq!(platform.to_string().trim_end(), AFTER_SOUTH);
+    }
+
+    #[test]
+    fn test_tilt_east() {
+        let mut platform: Platform = INITIAL.parse().unwrap();
+        println!("initial\n{}", platform);
+        platform.tilt(Direction::East);
+        println!("after tilt\n{}", platform);
+        assert_eq!(platform.to_string().trim_end(), AFTER_EAST);
     }
 
     #[test]
