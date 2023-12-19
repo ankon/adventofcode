@@ -242,6 +242,9 @@ fn print_pattern_and_mirror_indicators(pattern: &Pattern, column: Option<usize>,
 }
 
 pub fn main() {
+    // Part 1: 0, Part 2: 1.
+    static MAX_ERRORS: u32 = 1;
+
     match std::fs::read_to_string("day13.input") {
         Ok(mut input) => {
             let mut result = 0;
@@ -256,7 +259,7 @@ pub fn main() {
                     }
                     let pattern = tmp.parse::<Pattern>().unwrap();
                     let mut num_mirror_lines = 0;
-                    for (c, r) in pattern.find_mirror(0, false) {
+                    for (c, r) in pattern.find_mirror(MAX_ERRORS, false) {
                         if num_mirror_lines == 0 {
                             print_pattern_and_mirror_indicators(&pattern, c, r);
                         }
@@ -282,7 +285,7 @@ pub fn main() {
                     tmp.push('\n');
                 }
             }
-            println!("summarized = {}", result);
+            println!("summarized with MAX_ERRORS = {}: {}", MAX_ERRORS, result);
         }
         Err(reason) => println!("error = {}", reason),
     }
@@ -354,7 +357,21 @@ mod tests {
 #..#.##.####.##
 #..###.#.##.#.#
 .##.##.##..####";
-            let pattern = INPUT.parse::<Pattern>().unwrap();
-            assert_eq!(pattern.find_mirror(0, true).collect::<Vec<_>>(), vec![(Some(2), None)]);
-        }
+        let pattern = INPUT.parse::<Pattern>().unwrap();
+        assert_eq!(pattern.find_mirror(0, true).collect::<Vec<_>>(), vec![(Some(2), None)]);
+    }
+
+    #[test]
+    fn example2_data1() {
+        let pattern = DATA1.parse::<Pattern>().unwrap();
+        assert_eq!(pattern.find_mirror(1, true).collect::<Vec<_>>(), vec![(None, Some(3)), (Some(5), None)]);
+        print_pattern_with_row_indicator(&pattern, 3)
+    }
+
+    #[test]
+    fn example2_data2() {
+        let pattern = DATA2.parse::<Pattern>().unwrap();
+        assert_eq!(pattern.find_mirror(1, true).collect::<Vec<_>>(), vec![(None, Some(1)), (None, Some(4))]);
+        print_pattern_with_row_indicator(&pattern, 1)
+    }
 }
