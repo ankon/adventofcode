@@ -36,6 +36,35 @@ impl Platform {
         self.tilt(Direction::East);
     }
 
+    pub fn cycle_n(&mut self, n: usize) {
+        // Eventually things cycle back a previous state. It seems that happens
+        // after a few 10 cycles, so keep track of them in a simple vector.
+        // As soon as we found it, we can fast-forward the cycle counter, and then
+        // complete the remaining cycles.
+        let mut previous_states = vec![self.checksum()];
+        for cycle in 0..n {
+            self.cycle();
+
+            let checksum = self.checksum();
+            println!("cycle {} checksum = {}", cycle, checksum);
+            for (i, previous_checksum) in previous_states.iter().rev().enumerate() {
+                if checksum == *previous_checksum {
+                    println!("cycle {} matches cycle {} ({} cycles ago)", cycle, cycle-i, i);
+                    let cycle_length = i + 1;
+                    let remaining_cycles = n - cycle - 1;
+                    println!("remaining cycles = {}, cycle length = {}", remaining_cycles, cycle_length);
+                    let remaining_cycles = remaining_cycles % cycle_length;
+                    println!("fast-forwarding and finishing the last {} cycles", remaining_cycles);
+                    for _ in 0..remaining_cycles {
+                        self.cycle();
+                    }
+                    return;
+                }
+            }
+            previous_states.push(checksum);
+        }
+    }
+
     fn tilt_north_south(&mut self, rows: impl std::iter::Iterator<Item = usize>, source_rows: impl Fn(usize) -> Box<dyn std::iter::Iterator<Item = usize>>) {
         for r in rows {
             for c in 0..self.tiles[r].len() {
@@ -171,20 +200,7 @@ pub fn main() {
             platform.tilt(Direction::East);
 
             // Complete the remaining cycles
-            let mut previous_checksum = platform.checksum();
-            for cycle in 0..CYCLES-1 {
-                platform.cycle();
-
-                let checksum = platform.checksum();
-                println!("cycle {} checksum = {}", cycle, checksum);
-                if checksum == previous_checksum {
-                    break;
-                }
-                previous_checksum = checksum;
-                if cycle % 1000 == 0 {
-                    println!("complete {}%", cycle/CYCLES*100);
-                }
-            }
+            platform.cycle_n(CYCLES-1);
             println!("total load after {} cycles = {}", CYCLES, platform.total_load(Direction::North));
         },
         Err(reason) => println!("error = {}", reason),
@@ -344,19 +360,8 @@ OO....OO..
     fn test_part2() {
         let mut platform: Platform = INITIAL.parse().unwrap();
         println!("initial\n{}", platform);
-
-        let mut previous_checksum = platform.checksum();
-        for cycle in 0..CYCLES {
-            platform.cycle();
-
-            let checksum = platform.checksum();
-            println!("cycle {} checksum = {}", cycle, checksum);
-            if checksum == previous_checksum {
-                break;
-            }
-            previous_checksum = checksum;
-        }
-        println!("after tilt\n{}", platform);
+        platform.cycle_n(CYCLES);
+        println!("after cycle\n{}", platform);
         assert_eq!(platform.total_load(Direction::North), 64);
     }
 }
