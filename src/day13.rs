@@ -6,34 +6,29 @@ struct Pattern {
     // The pattern is a 2D array of characters, where each character is either a '#' or a '.'.
     pattern: Vec<Vec<char>>,
 
-    // Count of # in each column
-    columns: Vec<usize>,
-    // Count of # in each row
-    rows: Vec<usize>,
+    // Bit pattern per column, # is 1.
+    // The MSB represents the top row, the LSB the bottom row (possibly filled up with 0).
+    columns: Vec<u32>,
+    // Bit pattern per row, # is 1.
+    // The MSB represents the left column, the LSB the right column (possibly filled up with 0).
+    rows: Vec<u32>,
 }
 
 impl Pattern {
-    fn find_mirror_column(&self, print: bool) -> impl Iterator<Item = usize> {
+    fn find_mirror_column(&self, max_errors: u32, print: bool) -> impl Iterator<Item = usize> {
         let mut result = vec![];
         let mut last = None;
-        'outer: for (i, c) in self.columns.iter().enumerate() {
+        for (i, c) in self.columns.iter().enumerate() {
             if print {
-                println!("find_mirror_column: i = {}, c = {}, last = {:?}", i, c, last);
+                println!("find_mirror_column: i = {}, c = {:032b}, last = {:032b}", i, c, last.unwrap_or(0));
             }
             if let Some(l) = last {
-                if l == *c {
+                // Calculate the number of errors between this and the previous row. If we still have some
+                // left from our budget, proceed checking further.
+                let mut errors_left  = (max_errors as i32) - (((l as u32) ^ *c).count_ones() as i32);
+                if errors_left >= 0 {
                     if print {
                         println!("find_mirror_column: found potential mirror line at i = {}", i);
-                    }
-
-                    // Verify: The patterns must be the same now between this column and the previous column.
-                    for row in 0..self.pattern.len() {
-                        if self.pattern[row][i] != self.pattern[row][i - 1] {
-                            if print {
-                                println!("find_mirror_column: not matching pattern, i = {}, row = {}", i, row);
-                            }
-                            continue 'outer;
-                        }
                     }
 
                     // Found a potential mirror line
@@ -48,23 +43,15 @@ impl Pattern {
                             }
                             break;
                         }
-                        // Cheap compare first: If the numbers don't match, don't bother.
-                        if self.columns[check_column] != self.columns[other_column as usize] {
+                        // Count errors between these rows.
+                        let errors = (self.columns[check_column] ^ self.columns[other_column as usize]).count_ones() as i32;
+                        errors_left -= errors;
+                        if errors_left < 0 {
                             if print {
-                                println!("find_mirror_column: not matching numbers, i = {}, d = {}, [{}] = {} <> [{}] = {}", i, d, check_column, self.columns[check_column], other_column, self.columns[other_column as usize]);
+                                println!("find_mirror_column: not matching, i = {}, d = {}, [{}] = {:032b} <> [{}] = {:032b}", i, d, check_column, self.columns[check_column], other_column, self.columns[other_column as usize]);
                             }
                             found = false;
                             break;
-                        }
-                        // Ok, need the patterns.
-                        for row in 0..self.pattern.len() {
-                            if self.pattern[row][check_column] != self.pattern[row][other_column as usize] {
-                                if print {
-                                    println!("find_mirror_column: not matching pattern, i = {}, d = {}, row = {}", i, d, row);
-                                }
-                                found = false;
-                                break;
-                            }
                         }
 
                         // Proceed with the next pair.
@@ -81,28 +68,24 @@ impl Pattern {
         result.into_iter()
     }
 
-    fn find_mirror_row(&self, print: bool) -> impl Iterator<Item = usize> {
+    fn find_mirror_row(&self, max_errors: u32, print: bool) -> impl Iterator<Item = usize> {
         let mut result = vec![];
         let mut last = None;
-        'outer: for (i, c) in self.rows.iter().enumerate() {
+        for (i, c) in self.rows.iter().enumerate() {
             if print {
-                println!("find_mirror_row: row = \"{}\", i = {}, c = {}, last = {:?}", self.pattern[i].iter().collect::<String>(), i, c, last);
+                println!("find_mirror_row: row = \"{}\", i = {}, c = {:032b}, last = {:032b}", self.pattern[i].iter().collect::<String>(), i, c, last.unwrap_or(0));
             }
             if let Some(l) = last {
-                if l == *c {
+                // Calculate the number of errors between this and the previous row. If we still have some
+                // left from our budget, proceed checking further.
+                let mut errors_left  = (max_errors as i32) - (((l as u32) ^ *c).count_ones() as i32);
+                if errors_left >= 0 {
+                    // Found a potential mirror line
+                    // Iterate outwards from here
                     if print {
                         println!("find_mirror_row: found potential mirror line at i = {}", i);
                     }
-                    // Verify: The patterns must be the same now between this row and the previous row.
-                    if self.pattern[i] != self.pattern[i - 1] {
-                        if print {
-                            println!("find_mirror_row: not matching pattern, i = {}", i);
-                        }
-                        continue 'outer;
-                    }
 
-                    // Found a potential mirror line
-                    // Iterate outwards from here
                     let mut found = true;
                     for d in 1.. {
                         let check_row = i + d;
@@ -113,23 +96,15 @@ impl Pattern {
                             }
                             break;
                         }
-                        // Cheap compare first: If the numbers don't match, don't bother.
-                        if self.rows[check_row] != self.rows[other_row as usize] {
+                        // Count errors between these rows.
+                        let errors = (self.rows[check_row] ^ self.rows[other_row as usize]).count_ones() as i32;
+                        errors_left -= errors;
+                        if errors_left < 0 {
                             if print {
-                                println!("find_mirror_row: not matching numbers, i = {}, d = {}, [{}] = {} <> [{}] = {}", i, d, check_row, self.rows[check_row], other_row, self.rows[other_row as usize]);
+                                println!("find_mirror_row: not matching, i = {}, d = {}, [{}] = {:032b} <> [{}] = {:032b}", i, d, check_row, self.rows[check_row], other_row, self.rows[other_row as usize]);
                             }
                             found = false;
                             break;
-                        }
-                        // Ok, need the patterns.
-                        for row in 0..self.pattern.len() {
-                            if self.pattern[check_row] != self.pattern[other_row as usize] {
-                                if print {
-                                    println!("find_mirror_row: not matching pattern, i = {}, d = {}, row = {}", i, d, row);
-                                }
-                                found = false;
-                                break;
-                            }
                         }
 
                         // Proceed with the next pair.
@@ -146,15 +121,17 @@ impl Pattern {
         result.into_iter()
     }
 
-    pub fn find_mirror(&self, print: bool) -> impl Iterator<Item = (Option<usize>, Option<usize>)> {
+    pub fn find_mirror(&self, max_errors: u32, print: bool) -> impl Iterator<Item = (Option<usize>, Option<usize>)> {
         // Search until we find the same column twice: If it is a mirror line, then we can extend from there
         // and compare the columns. If both comparison directions hit the border, the line is a mirror, otherwise
         // proceed.
-        self.find_mirror_row(print).map(|row| (None, Some(row))).chain(
-            self.find_mirror_column(print).map(|column| (Some(column), None))
+        // NB: The task doesn't specify whether horizontal or vertical is "more important", so in theory both
+        //     configurations should give the same results ...
+        self.find_mirror_row(max_errors, print).map(|row| (None, Some(row))).chain(
+            self.find_mirror_column(max_errors, print).map(|column| (Some(column), None))
         )
-        // self.find_mirror_column(print).map(|column| (Some(column), None)).chain(
-        //     self.find_mirror_row(print).map(|row| (None, Some(row)))
+        // self.find_mirror_column(max_errors, print).map(|column| (Some(column), None)).chain(
+        //     self.find_mirror_row(max_errors, print).map(|row| (None, Some(row)))
         // )
     }
 }
@@ -165,20 +142,27 @@ impl std::str::FromStr for Pattern {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let mut columns = vec![];
         let mut rows = vec![];
-        let pattern = s.lines().map(|line| {
-            let row: Vec<_> = line.chars().collect();
-            let mut row_count = 0;
-            for (i, c) in row.iter().enumerate() {
-                if i >= columns.len() {
+        let pattern = s.lines().enumerate().map(|(r, line)| {
+            let pattern_row: Vec<_> = line.chars().collect();
+            let mut row = 0;
+            for (c, ch) in pattern_row.iter().enumerate() {
+                if c >= columns.len() {
                     columns.push(0);
                 }
-                if *c == '#' {
-                    columns[i] += 1;
-                    row_count += 1;
+
+                // Note that we don't know the width or height here, but to get the bits
+                // into a natural order we can just align them on the word size instead:
+                //
+                //   ##...##..
+                //   123456789
+                // 1 110001100
+                if *ch == '#' {
+                    columns[c] |= 1 << (31 - r);
+                    row |= 1 << (31 - c);
                 }
             }
-            rows.push(row_count);
-            row
+            rows.push(row);
+            pattern_row
         }).collect();
         Ok(Pattern {
             pattern,
@@ -272,7 +256,7 @@ pub fn main() {
                     }
                     let pattern = tmp.parse::<Pattern>().unwrap();
                     let mut num_mirror_lines = 0;
-                    for (c, r) in pattern.find_mirror(false) {
+                    for (c, r) in pattern.find_mirror(0, false) {
                         if num_mirror_lines == 0 {
                             print_pattern_and_mirror_indicators(&pattern, c, r);
                         }
@@ -327,14 +311,14 @@ mod tests {
     #[test]
     fn example1_data1() {
         let pattern = DATA1.parse::<Pattern>().unwrap();
-        assert_eq!(pattern.find_mirror(true).collect::<Vec<_>>(), vec![(Some(5), None)]);
+        assert_eq!(pattern.find_mirror(0, true).collect::<Vec<_>>(), vec![(Some(5), None)]);
         print_pattern_with_column_indicator(&pattern, 5)
     }
 
     #[test]
     fn example1_data2() {
         let pattern = DATA2.parse::<Pattern>().unwrap();
-        assert_eq!(pattern.find_mirror(true).collect::<Vec<_>>(), vec![(None, Some(4))]);
+        assert_eq!(pattern.find_mirror(0, true).collect::<Vec<_>>(), vec![(None, Some(4))]);
         print_pattern_with_row_indicator(&pattern, 4)
     }
 
@@ -358,7 +342,7 @@ mod tests {
 #...#..#.
 ...#.##.#";
         let pattern = INPUT.parse::<Pattern>().unwrap();
-        assert_eq!(pattern.find_mirror(true).collect::<Vec<_>>(), vec![(Some(6), None)]);
+        assert_eq!(pattern.find_mirror(0, true).collect::<Vec<_>>(), vec![(Some(6), None)]);
     }
 
     #[test]
@@ -371,6 +355,6 @@ mod tests {
 #..###.#.##.#.#
 .##.##.##..####";
             let pattern = INPUT.parse::<Pattern>().unwrap();
-            assert_eq!(pattern.find_mirror(true).collect::<Vec<_>>(), vec![(Some(2), None)]);
+            assert_eq!(pattern.find_mirror(0, true).collect::<Vec<_>>(), vec![(Some(2), None)]);
         }
 }
