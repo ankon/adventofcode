@@ -43,7 +43,45 @@ impl std::str::FromStr for Contraption {
 }
 
 impl Contraption {
-    pub fn simulate_light_beam(&self, print: bool, stop_after: Option<usize>) -> usize {
+    pub fn simulate_all_light_beams(&self) -> usize {
+        let mut result = 0;
+        let mut best = None;
+        // Simulate beams coming from left and right
+        for y in 0..self.tiles.len() {
+            let mut source = (0, y, Direction::Right);
+            let mut num = self.simulate_light_beam(source, false, None);
+            if num > result {
+                result = num;
+                best = Some(source);
+            }
+            source = (self.tiles[y].len() - 1, y, Direction::Left);
+            num = self.simulate_light_beam(source, false, None);
+            if num > result {
+                result = num;
+                best = Some(source);
+            }
+        }
+        // Simulate beams coming from top and bottom
+        for x in 0..self.tiles[0].len() {
+            let mut source = (x, 0, Direction::Down);
+            let mut num = self.simulate_light_beam(source, false, None);
+            if num > result {
+                result = num;
+                best = Some(source);
+            }
+            source = (x, self.tiles.len() - 1, Direction::Up);
+            num = self.simulate_light_beam(source, false, None);
+            if num > result {
+                result = num;
+                best = Some(source);
+            }
+        }
+
+        println!("best = {:?}", best);
+        result
+    }
+
+    pub fn simulate_light_beam(&self, source: (usize, usize, Direction), print: bool, stop_after: Option<usize>) -> usize {
         let mut beam_heads: Vec<(usize, usize, Direction)> = vec![];
 
         // Create a field of the same size as the contraption and track the direction of each beam
@@ -57,7 +95,7 @@ impl Contraption {
 
         // Start with one beam in the top left corner, pointing right:
         let mut steps = 0;
-        beam_heads.push((0, 0, Direction::Right));
+        beam_heads.push(source);
         while let Some((x, y, direction)) = beam_heads.pop() {
             if print {
                 println!("beam at ({}, {}) {:?}", x, y, direction);
@@ -199,7 +237,8 @@ pub fn main() {
     match std::fs::read_to_string("day16.input") {
         Ok(input) => {
             if let Ok(contraption) = input.parse::<Contraption>() {
-                println!("part1 = {}", contraption.simulate_light_beam(true, None));
+                println!("part1 = {}", contraption.simulate_light_beam((0, 0, Direction::Right), false, None));
+                println!("part2 = {}", contraption.simulate_all_light_beams());
             } else {
                 println!("error parsing input");
             }
@@ -225,6 +264,6 @@ mod tests {
 
     #[test]
     fn part1() {
-        assert_eq!(EXAMPLE.parse::<Contraption>().unwrap().simulate_light_beam(true, Some(200)), 46);
+        assert_eq!(EXAMPLE.parse::<Contraption>().unwrap().simulate_light_beam((0, 0, Direction::Right), true, Some(200)), 46);
     }
 }
